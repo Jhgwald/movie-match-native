@@ -31,7 +31,8 @@
     },
     "scheme": "movie-match",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-asset"
     ]
   }
 }
