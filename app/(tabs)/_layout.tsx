@@ -1,67 +1,134 @@
+import { useCallback, useRef, type ReactNode } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Animated, View } from 'react-native';
+import {
+  ProfileTabAnimationProvider,
+  useProfileTabAnimation,
+  type TabIconKey,
+} from '../../src/context/ProfileTabAnimationContext';
+
+function TabIconTracker({
+  tabKey,
+  children,
+  animatedStyle,
+}: {
+  tabKey: TabIconKey;
+  children: ReactNode;
+  animatedStyle?: any;
+}) {
+  const { registerIconPosition } = useProfileTabAnimation();
+  const containerRef = useRef<View | null>(null);
+
+  const handleLayout = useCallback(() => {
+    requestAnimationFrame(() => {
+      containerRef.current?.measureInWindow((x, y, width, height) => {
+        registerIconPosition(tabKey, {
+          x: x + width / 2,
+          y: y + height / 2,
+        });
+      });
+    });
+  }, [registerIconPosition, tabKey]);
+
+  const content = animatedStyle ? (
+    <Animated.View style={animatedStyle}>{children}</Animated.View>
+  ) : (
+    children
+  );
+
+  return (
+    <View ref={containerRef} onLayout={handleLayout} style={{ alignItems: 'center', justifyContent: 'center' }}>
+      {content}
+    </View>
+  );
+}
+
+function PartyTabIcon({ color, size }: { color: string; size: number }) {
+  return (
+    <TabIconTracker tabKey="party">
+      <Ionicons name="film" size={size} color={color} />
+    </TabIconTracker>
+  );
+}
+
+function ProfileTabIcon({ color, size }: { color: string; size: number }) {
+  const { profileShakeValue } = useProfileTabAnimation();
+
+  return (
+    <TabIconTracker
+      tabKey="profile"
+      animatedStyle={{ transform: [{ translateX: profileShakeValue }] }}
+    >
+      <Ionicons name="person" size={size} color={color} />
+    </TabIconTracker>
+  );
+}
 
 export default function TabLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#e50914',
-        tabBarInactiveTintColor: '#8e8e93',
-        headerStyle: {
-          backgroundColor: '#000',
-        },
-        headerTintColor: '#fff',
-        tabBarStyle: {
-          backgroundColor: '#000',
-          borderTopColor: '#1c1c1e',
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Feed',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
+    <ProfileTabAnimationProvider>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: '#DC2026', // Cinema TV Red
+          tabBarInactiveTintColor: '#C0C1C1', // Light Gray
+          headerStyle: {
+            backgroundColor: '#000',
+          },
+          headerTintColor: '#fff',
+          tabBarStyle: {
+            backgroundColor: '#000',
+            borderTopColor: '#1c1c1e',
+          },
         }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: 'Search',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="friends"
-        options={{
-          title: 'Friends',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="party"
-        options={{
-          title: 'Party',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="film" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Feed',
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="home" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="search"
+          options={{
+            title: 'Search',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="search" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="friends"
+          options={{
+            title: 'Friends',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="people" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="party"
+          options={{
+            title: 'Party',
+            tabBarIcon: ({ color, size }) => (
+              <PartyTabIcon color={color} size={size} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ color, size }) => (
+              <ProfileTabIcon color={color} size={size} />
+            ),
+          }}
+        />
+      </Tabs>
+    </ProfileTabAnimationProvider>
   );
 }

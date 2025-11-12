@@ -33,6 +33,11 @@
     "plugins": [
       "expo-router",
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "local-dev"
+      }
+    }
   }
 }
