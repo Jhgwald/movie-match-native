@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SwipeDeck from '../../src/components/SwipeDeck';
@@ -10,6 +10,8 @@ import { HAS_TMDB } from '../../src/config/env';
 import { markSeen, markPassed, markWatchlist } from '../../src/state/library';
 import type { Movie, MovieBase } from '../../src/types/movie';
 import { useProfileTabAnimation } from '../../src/context/ProfileTabAnimationContext';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
@@ -51,8 +53,8 @@ export default function FeedScreen() {
   };
 
   const handleSwipeRight = (movie: MovieBase | Movie) => {
-    // Right = Seen ✅
-    markSeen(movie.id);
+    // Right = Watchlist 🔖
+    markWatchlist(movie.id);
   };
 
   const handleSwipeLeft = (movie: MovieBase | Movie) => {
@@ -61,8 +63,8 @@ export default function FeedScreen() {
   };
 
   const handleSwipeUp = (movie: MovieBase | Movie) => {
-    // Up = Watchlist 🔖
-    markWatchlist(movie.id);
+    // Up = Seen ✅
+    markSeen(movie.id);
   };
 
   const handleSwipeDown = (movie: MovieBase | Movie) => {
@@ -80,7 +82,11 @@ export default function FeedScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
       
-      <View style={[styles.deckContainer, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }]}>
+      <View style={[styles.deckContainer, { 
+        paddingTop: insets.top + 8, 
+        paddingBottom: 0,
+        height: SCREEN_HEIGHT - insets.top,
+      }]}>
         <SwipeDeck
           movies={movies}
           onSwipeRight={handleSwipeRight}
@@ -90,6 +96,7 @@ export default function FeedScreen() {
           onDetails={handleDetails}
           onProfileShake={triggerProfileShake}
           profileIconPosition={iconPositions.profile}
+          maxTicketHeight={SCREEN_HEIGHT - insets.top - insets.bottom - 49 - 8 - 8}
         />
       </View>
 
@@ -111,7 +118,7 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f0f',
+    backgroundColor: '#6B0000', // Deep red like movie theater carpet and seats
   },
   deckContainer: {
     flex: 1,

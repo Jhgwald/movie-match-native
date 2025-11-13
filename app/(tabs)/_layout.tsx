@@ -73,12 +73,12 @@ export default function TabLayout() {
           tabBarActiveTintColor: '#DC2026', // Cinema TV Red
           tabBarInactiveTintColor: '#C0C1C1', // Light Gray
           headerStyle: {
-            backgroundColor: '#000',
+            backgroundColor: '#7E1616', // Dark red - movie theater background
           },
-          headerTintColor: '#fff',
+          headerTintColor: '#FFFEAD', // Butter yellow
           tabBarStyle: {
-            backgroundColor: '#000',
-            borderTopColor: '#1c1c1e',
+            backgroundColor: '#7E1616', // Dark red - movie theater background
+            borderTopColor: '#DC2026', // Red border
           },
         }}
       >

@@ -43,6 +43,7 @@ interface SwipeDeckProps {
   onDetails?: (movie: MovieBase | Movie) => void;
   onProfileShake?: () => void;
   profileIconPosition?: ProfileIconPosition | null;
+  maxTicketHeight?: number;
 }
 
 // Helper component for centered floating label
@@ -85,10 +86,11 @@ export default function SwipeDeck({
   onDetails,
   onProfileShake,
   profileIconPosition,
+  maxTicketHeight,
 }: SwipeDeckProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [overlayColorState, setOverlayColorState] = useState<string>('transparent');
-  const [cardBorderColor, setCardBorderColor] = useState<string>('#DC2026'); // Default cinema red
+  const [cardBorderColor, setCardBorderColor] = useState<string>('#FFFEAD'); // Default butter yellow
   const position = useRef(new Animated.ValueXY()).current;
   const rotate = useRef(new Animated.Value(0)).current;
   const flipY = useRef(new Animated.Value(0)).current;
@@ -175,6 +177,9 @@ export default function SwipeDeck({
       const impactX = targetX + impactOffsetX;
       const impactY = targetY + impactOffsetY;
 
+      // Get current overlay opacity to maintain it during animation
+      const currentOverlayOpacity = (overlayOpacity as any)._value || 0.2;
+
       return new Promise<void>((resolve) => {
         Animated.sequence([
           Animated.parallel([
@@ -192,6 +197,13 @@ export default function SwipeDeck({
             }),
             Animated.timing(cardOpacity, {
               toValue: liftOpacity,
+              duration: liftDuration,
+              easing: easingUp,
+              useNativeDriver: false,
+            }),
+            // Keep overlay visible during lift, fade with card
+            Animated.timing(overlayOpacity, {
+              toValue: currentOverlayOpacity * liftOpacity,
               duration: liftDuration,
               easing: easingUp,
               useNativeDriver: false,
@@ -216,19 +228,34 @@ export default function SwipeDeck({
               easing: easingDown,
               useNativeDriver: false,
             }),
+            // Fade overlay out with card
+            Animated.timing(overlayOpacity, {
+              toValue: 0,
+              duration: diveDuration,
+              easing: easingDown,
+              useNativeDriver: false,
+            }),
           ]),
-        ]).start(() => resolve());
+        ]).start(() => {
+          // Reset overlay after animation
+          overlayOpacity.setValue(0);
+          setOverlayColorState('transparent');
+          resolve();
+        });
       });
     },
-    [cardOpacity, position, scale]
+    [cardOpacity, position, scale, overlayOpacity]
   );
 
   const finishProfileCatch = () => {
     onProfileShake?.();
     setTimeout(() => {
+      // Reset values before calling nextCard
       position.setValue({ x: 0, y: 0 });
       scale.setValue(1);
       cardOpacity.setValue(1);
+      // Ensure animation flag is reset before nextCard sets it
+      isAnimating.current = false;
       nextCard();
     }, 280);
   };
@@ -262,8 +289,8 @@ export default function SwipeDeck({
           // Horizontal
           if (dx > 0) {
             labelDirection.current = 'right';
-            setOverlayColorState('#4caf50'); // Green for Seen
-            setCardBorderColor('#4caf50'); // Green border for Seen
+            setOverlayColorState('#4caf50'); // Green for Watchlist
+            setCardBorderColor('#4caf50'); // Green border for Watchlist
             overlayOpacity.setValue(Math.min(absDx / 150, 0.2));
             labelOpacity.setValue(Math.min(absDx / 80, 1));
           } else {
@@ -277,8 +304,8 @@ export default function SwipeDeck({
           // Vertical
           if (dy < 0) {
             labelDirection.current = 'up';
-            setOverlayColorState('#FFD700'); // Yellow for Watchlist
-            setCardBorderColor('#FFD700'); // Yellow border for Watchlist
+            setOverlayColorState('#FFD700'); // Yellow for Seen
+            setCardBorderColor('#FFD700'); // Yellow border for Seen
             overlayOpacity.setValue(Math.min(absDy / 150, 0.2));
             labelOpacity.setValue(Math.min(absDy / 80, 1));
           } else {
@@ -294,10 +321,6 @@ export default function SwipeDeck({
         if (isAnimating.current) return;
         
         position.flattenOffset();
-        overlayOpacity.setValue(0);
-        labelOpacity.setValue(0);
-        setOverlayColorState('transparent');
-        labelDirection.current = null;
         
         const { dx, dy, vx, vy } = gesture;
         const absDx = Math.abs(dx);
@@ -308,24 +331,42 @@ export default function SwipeDeck({
         // Use velocity to help determine direction if distance is borderline
         const isHorizontal = absDx > absDy || (absDx === absDy && absVx > absVy);
         
+        // Determine swipe direction before resetting overlay
+        let swipeDirection: 'left' | 'right' | 'up' | 'down' | null = null;
+        
         if (isHorizontal) {
           // Horizontal swipe
           if (dx > SWIPE_THRESHOLD || (dx > 50 && vx > VELOCITY_THRESHOLD)) {
-            handleSwipe('right');
+            swipeDirection = 'right';
           } else if (dx < -SWIPE_THRESHOLD || (dx < -50 && vx < -VELOCITY_THRESHOLD)) {
-            handleSwipe('left');
-          } else {
-            resetPosition();
+            swipeDirection = 'left';
           }
         } else {
           // Vertical swipe
           if (dy < -SWIPE_THRESHOLD || (dy < -50 && vy < -VELOCITY_THRESHOLD)) {
-            handleSwipe('up');
+            swipeDirection = 'up';
           } else if (dy > SWIPE_THRESHOLD || (dy > 50 && vy > VELOCITY_THRESHOLD)) {
-            handleSwipe('down');
-          } else {
-            resetPosition();
+            swipeDirection = 'down';
           }
+        }
+        
+        // For right/up swipes, keep overlay visible during animation
+        // For left/down or no swipe, reset overlay
+        if (swipeDirection === 'right' || swipeDirection === 'up') {
+          // Keep overlay visible - it will fade with the card
+          labelOpacity.setValue(0); // Hide label but keep overlay
+        } else {
+          // Reset overlay for left/down/no swipe
+          overlayOpacity.setValue(0);
+          setOverlayColorState('transparent');
+          labelOpacity.setValue(0);
+          labelDirection.current = null;
+        }
+        
+        if (swipeDirection) {
+          handleSwipe(swipeDirection);
+        } else {
+          resetPosition();
         }
       },
     })
@@ -342,9 +383,23 @@ export default function SwipeDeck({
 
     switch (direction) {
       case 'right':
-        // Change border to green for "Seen"
+        // Change border to green for "Watchlist"
         setCardBorderColor('#4caf50'); // Green
         onSwipeRight?.(movie);
+        // Card arcs up then to Profile tab, shrinking INTO the icon
+        // Keep the green border color during animation
+        const { x: profileTargetX, y: profileTargetY } = getProfileTargetOffset();
+        throwCardIntoTarget(profileTargetX, profileTargetY).then(finishProfileCatch);
+        return;
+      case 'left':
+        x = -SCREEN_WIDTH * 1.5;
+        onSwipeLeft?.(movie);
+        break;
+      case 'up':
+        // Change border to yellow for "Seen"
+        setCardBorderColor('#FFD700'); // Yellow
+        onSwipeUp?.(movie);
+        // Keep the yellow border color during animation
         const { x: seenTargetX, y: seenTargetY } = getProfileTargetOffset();
         throwCardIntoTarget(seenTargetX, seenTargetY, {
           arcPeakX: seenTargetX * 0.2,
@@ -354,18 +409,6 @@ export default function SwipeDeck({
           peakScale: 0.88,
           liftOpacity: 0.95,
         }).then(finishProfileCatch);
-        return;
-      case 'left':
-        x = -SCREEN_WIDTH * 1.5;
-        onSwipeLeft?.(movie);
-        break;
-      case 'up':
-        // Change border to yellow for "Watchlist"
-        setCardBorderColor('#FFD700'); // Yellow
-        // Card arcs up then to Profile tab, shrinking INTO the icon
-        const { x: profileTargetX, y: profileTargetY } = getProfileTargetOffset();
-        onSwipeUp?.(movie);
-        throwCardIntoTarget(profileTargetX, profileTargetY).then(finishProfileCatch);
         return;
       case 'down':
         // Swipe down to show details - card moves down and then resets
@@ -424,7 +467,7 @@ export default function SwipeDeck({
     overlayOpacity.setValue(0);
     labelOpacity.setValue(0);
     setOverlayColorState('transparent');
-    setCardBorderColor('#DC2026'); // Reset to default red
+    setCardBorderColor('#FFFEAD'); // Reset to default butter yellow
     labelDirection.current = null;
     
     // Smooth spring animation for any remaining movement
@@ -462,16 +505,52 @@ export default function SwipeDeck({
     setCurrentIndex((prev) => {
       const next = prev + 1;
       if (next < movies.length) {
-        position.setValue({ x: 0, y: 0 });
+        // Keep animation flag true during slide-up
+        isAnimating.current = true;
+        
+        // Flatten any existing offset from previous gesture
+        position.flattenOffset();
+        
+        // Start new ticket completely offscreen below (immediate fast slide-up)
+        position.setValue({ x: 0, y: SCREEN_HEIGHT * 0.6 });
         rotate.setValue(0);
         flipY.setValue(0);
-        scale.setValue(1);
-        cardOpacity.setValue(1);
+        scale.setValue(0.95);
+        cardOpacity.setValue(0.8);
         overlayOpacity.setValue(0);
         labelOpacity.setValue(0);
         setOverlayColorState('transparent');
-        setCardBorderColor('#DC2026'); // Reset to default red
+        setCardBorderColor('#FFFEAD'); // Reset to default butter yellow
         labelDirection.current = null;
+        
+        // Immediate fast slide-up animation with bounce
+        Animated.parallel([
+          Animated.spring(position, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+            tension: 100, // Faster
+            friction: 7,
+          }),
+          Animated.spring(scale, {
+            toValue: 1,
+            useNativeDriver: false,
+            tension: 100, // Faster
+            friction: 7,
+          }),
+          Animated.timing(cardOpacity, {
+            toValue: 1,
+            duration: 120, // Faster fade-in
+            useNativeDriver: false,
+          }),
+        ]).start(() => {
+          // Ensure position is at origin and ready for next gesture
+          position.flattenOffset();
+          position.setValue({ x: 0, y: 0 });
+          // Reset animation flag so gestures work
+          isAnimating.current = false;
+        });
+      } else {
+        // No more cards, reset animation flag
         isAnimating.current = false;
       }
       return next;
@@ -505,16 +584,24 @@ export default function SwipeDeck({
       };
     }
 
+    // Next ticket stays completely offscreen below until current is committed
     if (isNextCard) {
       return {
-        transform: [{ scale: 0.95 }],
-        opacity: 0.9,
+        transform: [
+          { translateY: SCREEN_HEIGHT * 0.6 }, // Completely offscreen
+          { scale: 0.95 },
+        ],
+        opacity: 0,
       };
     }
 
+    // Cards further back stay hidden
     return {
-      transform: [{ scale: 0.9 }],
-      opacity: 0.7,
+      transform: [
+        { translateY: SCREEN_HEIGHT * 0.6 },
+        { scale: 0.9 },
+      ],
+      opacity: 0,
     };
   };
 
@@ -539,11 +626,11 @@ export default function SwipeDeck({
     
     switch (labelDirection.current) {
       case 'right':
-        return '#4caf50'; // Green for Seen
+        return '#4caf50'; // Green for Watchlist
       case 'left':
         return '#DC2026'; // Red for Not Interested
       case 'up':
-        return '#FFD700'; // Yellow for Watchlist
+        return '#FFD700'; // Yellow for Seen
       case 'down':
         return '#FFD700'; // Yellow for Details
       default:
@@ -556,11 +643,11 @@ export default function SwipeDeck({
     
     switch (labelDirection.current) {
       case 'right':
-        return { label: 'Seen', emoji: '✅', color: '#4caf50' }; // Green
+        return { label: 'Watchlist', emoji: '🔖', color: '#4caf50' }; // Green
       case 'left':
         return { label: 'Pass', emoji: '🚫', color: '#DC2026' }; // Red
       case 'up':
-        return { label: 'Watchlist', emoji: '🔖', color: '#FFD700' }; // Yellow
+        return { label: 'Seen', emoji: '✅', color: '#FFD700' }; // Yellow
       case 'down':
         return { label: 'Details', emoji: 'ℹ️', color: '#FFD700' }; // Yellow
       default:
@@ -587,7 +674,7 @@ export default function SwipeDeck({
           cardStyle,
           { zIndex },
         ]}
-        {...(isTopCard && !isAnimating.current ? panResponder.panHandlers : {})}
+        {...(isTopCard ? panResponder.panHandlers : {})}
       >
         {isTopCard ? (
           <>
@@ -601,6 +688,7 @@ export default function SwipeDeck({
                 movie={movie}
                 onDetails={() => onDetails?.(movie)}
                 borderColor={cardBorderColor}
+                maxHeight={maxTicketHeight}
               />
             </Animated.View>
             <Animated.View
@@ -643,6 +731,7 @@ export default function SwipeDeck({
             movie={movie}
             onDetails={() => onDetails?.(movie)}
             borderColor="#DC2026"
+            maxHeight={maxTicketHeight}
           />
         )}
       </Animated.View>
