@@ -35,6 +35,7 @@ export default function MoviesToRankScreen() {
   };
 
   const handleCardPress = (movie: Movie | MovieBase) => {
+    console.log('[Movies to Rank] Opening details for:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };

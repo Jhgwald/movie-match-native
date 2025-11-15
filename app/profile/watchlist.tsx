@@ -35,6 +35,7 @@ export default function WatchlistScreen() {
   };
 
   const handleCardPress = (movie: Movie | MovieBase) => {
+    console.log('[Watchlist] Opening details for:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };

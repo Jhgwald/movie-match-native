@@ -26,23 +26,22 @@ interface DetailsModalProps {
 }
 
 export default function DetailsModal({ visible, movie, onClose }: DetailsModalProps) {
+  // CRITICAL: Always initialize from current prop value
   const [enrichedMovie, setEnrichedMovie] = useState<MovieBase | Movie>(movie);
   const [loading, setLoading] = useState(false);
   const [director, setDirector] = useState<string | null>(null);
   const [cast, setCast] = useState<string[]>([]);
   const [ratings, setRatings] = useState<MovieRatings>({});
 
-  // Initialize state from movie prop on mount
-  // (key prop forces remount when movie changes, so this always has fresh data)
+  // Update state whenever movie prop changes (defensive - key prop should force remount)
   useEffect(() => {
+    console.log('[DetailsModal] Movie prop changed to:', movie.id, movie.title);
     setEnrichedMovie(movie);
     setRatings('ratings' in movie ? movie.ratings || {} : {});
     setDirector(null);
     setCast([]);
     setLoading(false);
-
-    console.log('[DetailsModal] Mounted/reset with movie:', movie.id, movie.title);
-  }, []); // Empty deps - only runs on mount (key prop handles movie changes)
+  }, [movie.id]); // Depend on movie.id to catch prop changes
   
   // Fetch additional details when modal becomes visible
   useEffect(() => {

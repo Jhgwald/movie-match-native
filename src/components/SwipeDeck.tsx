@@ -289,13 +289,13 @@ export default function SwipeDeck({
           // Horizontal
           if (dx > 0) {
             labelDirection.current = 'right';
-            setOverlayColorState('#4caf50'); // Green for Watchlist
-            setCardBorderColor('#4caf50'); // Green border for Watchlist
+            setOverlayColorState('#FFD700'); // Yellow for Seen
+            setCardBorderColor('#FFD700'); // Yellow border for Seen
             overlayOpacity.setValue(Math.min(absDx / 150, 0.2));
             labelOpacity.setValue(Math.min(absDx / 80, 1));
           } else {
             labelDirection.current = 'left';
-            setOverlayColorState('#DC2026'); // Red for Not Interested
+            setOverlayColorState('#DC2026'); // Red for Pass
             setCardBorderColor('#DC2026'); // Red border for Pass
             overlayOpacity.setValue(Math.min(absDx / 150, 0.2));
             labelOpacity.setValue(Math.min(absDx / 80, 1));
@@ -304,14 +304,14 @@ export default function SwipeDeck({
           // Vertical
           if (dy < 0) {
             labelDirection.current = 'up';
-            setOverlayColorState('#FFD700'); // Yellow for Seen
-            setCardBorderColor('#FFD700'); // Yellow border for Seen
+            setOverlayColorState('#4caf50'); // Green for Watchlist
+            setCardBorderColor('#4caf50'); // Green border for Watchlist
             overlayOpacity.setValue(Math.min(absDy / 150, 0.2));
             labelOpacity.setValue(Math.min(absDy / 80, 1));
           } else {
             labelDirection.current = 'down';
-            setOverlayColorState('#FFD700'); // Yellow for Details
-            setCardBorderColor('#DC2026'); // Keep red for Details (no action)
+            setOverlayColorState('#FFD700'); // Yellow for Seen + Details
+            setCardBorderColor('#FFD700'); // Yellow border for Seen
             overlayOpacity.setValue(Math.min(absDy / 150, 0.2));
             labelOpacity.setValue(Math.min(absDy / 80, 1));
           }
@@ -374,36 +374,35 @@ export default function SwipeDeck({
 
   const handleSwipe = (direction: 'left' | 'right' | 'up' | 'down') => {
     if (isAnimating.current || currentIndex >= movies.length) return;
-    
+
     isAnimating.current = true;
     const movie = movies[currentIndex];
+    console.log(`[SwipeDeck] Swipe ${direction} on movie:`, movie.id, movie.title, `(index: ${currentIndex})`);
     let x = 0;
     let y = 0;
     let shouldAdvance = true;
 
     switch (direction) {
       case 'right':
-        // Change border to green for "Watchlist"
-        setCardBorderColor('#4caf50'); // Green
+        // Right = Seen → Yellow border, arc to Profile
+        setCardBorderColor('#FFD700'); // Yellow for Seen
         onSwipeRight?.(movie);
-        // Card arcs up then to Profile tab, shrinking INTO the icon
-        // Keep the green border color during animation
-        const { x: profileTargetX, y: profileTargetY } = getProfileTargetOffset();
-        throwCardIntoTarget(profileTargetX, profileTargetY).then(finishProfileCatch);
+        const { x: seenTargetX, y: seenTargetY } = getProfileTargetOffset();
+        throwCardIntoTarget(seenTargetX, seenTargetY).then(finishProfileCatch);
         return;
       case 'left':
+        // Left = Pass → Red, slide off left
         x = -SCREEN_WIDTH * 1.5;
         onSwipeLeft?.(movie);
         break;
       case 'up':
-        // Change border to yellow for "Seen"
-        setCardBorderColor('#FFD700'); // Yellow
+        // Up = Watchlist → Green border, arc to Profile
+        setCardBorderColor('#4caf50'); // Green for Watchlist
         onSwipeUp?.(movie);
-        // Keep the yellow border color during animation
-        const { x: seenTargetX, y: seenTargetY } = getProfileTargetOffset();
-        throwCardIntoTarget(seenTargetX, seenTargetY, {
-          arcPeakX: seenTargetX * 0.2,
-          arcPeakY: Math.min(-SCREEN_HEIGHT * 0.25, seenTargetY - 90),
+        const { x: watchlistTargetX, y: watchlistTargetY } = getProfileTargetOffset();
+        throwCardIntoTarget(watchlistTargetX, watchlistTargetY, {
+          arcPeakX: watchlistTargetX * 0.2,
+          arcPeakY: Math.min(-SCREEN_HEIGHT * 0.25, watchlistTargetY - 90),
           liftDuration: 260,
           diveDuration: 360,
           peakScale: 0.88,
@@ -411,8 +410,9 @@ export default function SwipeDeck({
         }).then(finishProfileCatch);
         return;
       case 'down':
-        // Swipe down to show details - card moves down and then resets
-        y = SCREEN_HEIGHT * 0.3; // Move down a bit to show action
+        // Down = Seen + Show Details → Yellow, animate down then reset (no advance)
+        setCardBorderColor('#FFD700'); // Yellow for Seen
+        y = SCREEN_HEIGHT * 0.3;
         onSwipeDown?.(movie);
         shouldAdvance = false;
         // Animate down then reset
@@ -623,16 +623,16 @@ export default function SwipeDeck({
 
   const getOverlayColor = () => {
     if (!labelDirection.current) return 'transparent';
-    
+
     switch (labelDirection.current) {
       case 'right':
-        return '#4caf50'; // Green for Watchlist
-      case 'left':
-        return '#DC2026'; // Red for Not Interested
-      case 'up':
         return '#FFD700'; // Yellow for Seen
+      case 'left':
+        return '#DC2026'; // Red for Pass
+      case 'up':
+        return '#4caf50'; // Green for Watchlist
       case 'down':
-        return '#FFD700'; // Yellow for Details
+        return '#FFD700'; // Yellow for Seen + Details
       default:
         return 'transparent';
     }
@@ -640,16 +640,16 @@ export default function SwipeDeck({
 
   const getLabelConfig = () => {
     if (!labelDirection.current) return null;
-    
+
     switch (labelDirection.current) {
       case 'right':
-        return { label: 'Watchlist', emoji: '🔖', color: '#4caf50' }; // Green
+        return { label: 'Seen', emoji: '✅', color: '#FFD700' }; // Yellow
       case 'left':
         return { label: 'Pass', emoji: '🚫', color: '#DC2026' }; // Red
       case 'up':
-        return { label: 'Seen', emoji: '✅', color: '#FFD700' }; // Yellow
+        return { label: 'Watchlist', emoji: '🔖', color: '#4caf50' }; // Green
       case 'down':
-        return { label: 'Details', emoji: 'ℹ️', color: '#FFD700' }; // Yellow
+        return { label: 'Seen + Details', emoji: '👀', color: '#FFD700' }; // Yellow
       default:
         return null;
     }

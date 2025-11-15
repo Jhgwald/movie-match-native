@@ -53,27 +53,33 @@ export default function FeedScreen() {
   };
 
   const handleSwipeRight = (movie: MovieBase | Movie) => {
-    // Right = Watchlist 🔖
-    markWatchlist(movie.id);
+    // Right = Like → Mark as SEEN → Add to Movies to Rank
+    console.log('[Feed] Swipe RIGHT (Seen):', movie.id, movie.title);
+    markSeen(movie.id);
   };
 
   const handleSwipeLeft = (movie: MovieBase | Movie) => {
-    // Left = Pass 🚫
+    // Left = Skip → Do not add anywhere
+    console.log('[Feed] Swipe LEFT (Pass):', movie.id, movie.title);
     markPassed(movie.id);
   };
 
   const handleSwipeUp = (movie: MovieBase | Movie) => {
-    // Up = Seen ✅
-    markSeen(movie.id);
+    // Up = Add to WATCHLIST (not Seen)
+    console.log('[Feed] Swipe UP (Watchlist):', movie.id, movie.title);
+    markWatchlist(movie.id);
   };
 
   const handleSwipeDown = (movie: MovieBase | Movie) => {
-    // Down = Details (don't advance card, just show modal)
+    // Down = Mark as SEEN + Show Details
+    console.log('[Feed] Swipe DOWN (Seen + Details):', movie.id, movie.title);
+    markSeen(movie.id);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };
 
   const handleDetails = (movie: MovieBase | Movie) => {
+    console.log('[Feed] Details requested for:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };
