@@ -67,6 +67,7 @@ export function markSeen(id: string): void {
   seenIds.add(id);
   passedIds.delete(id);
   watchlistIds.delete(id);
+  console.log(`[Library] markSeen('${id}') - seenIds now:`, Array.from(seenIds));
   saveToStorage();
 }
 
@@ -74,6 +75,7 @@ export function markPassed(id: string): void {
   passedIds.add(id);
   seenIds.delete(id);
   watchlistIds.delete(id);
+  console.log(`[Library] markPassed('${id}') - passedIds now:`, Array.from(passedIds));
   saveToStorage();
 }
 
@@ -81,6 +83,7 @@ export function markWatchlist(id: string): void {
   watchlistIds.add(id);
   passedIds.delete(id);
   // Don't remove from seen - you can watchlist something you've seen
+  console.log(`[Library] markWatchlist('${id}') - watchlistIds now:`, Array.from(watchlistIds));
   saveToStorage();
 }
 
@@ -109,5 +112,18 @@ export function isPassed(id: string): boolean {
 
 export function isWatchlist(id: string): boolean {
   return watchlistIds.has(id);
+}
+
+// Get all IDs as arrays (for displaying in lists)
+export function getSeenIds(): string[] {
+  return Array.from(seenIds);
+}
+
+export function getWatchlistIds(): string[] {
+  return Array.from(watchlistIds);
+}
+
+export function getPassedIds(): string[] {
+  return Array.from(passedIds);
 }
 
