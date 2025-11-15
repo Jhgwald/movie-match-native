@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { Link } from 'expo-router';
 
 export default function ProfileScreen() {
   return (
@@ -28,6 +29,35 @@ export default function ProfileScreen() {
           <Text style={styles.statLabel}>Parties</Text>
         </View>
       </View>
+
+      {/* Navigation Menu Items */}
+      <View style={styles.menuSection}>
+        <Link href="/profile/movies-to-rank" asChild>
+          <TouchableOpacity style={styles.menuItem}>
+            <Ionicons name="film-outline" size={24} color="#fff" />
+            <Text style={styles.menuItemText}>Movies to Rank</Text>
+            <Ionicons name="chevron-forward" size={24} color="#8e8e93" />
+          </TouchableOpacity>
+        </Link>
+
+        <Link href="/profile/watchlist" asChild>
+          <TouchableOpacity style={styles.menuItem}>
+            <Ionicons name="bookmark-outline" size={24} color="#fff" />
+            <Text style={styles.menuItemText}>Your Watchlist</Text>
+            <Ionicons name="chevron-forward" size={24} color="#8e8e93" />
+          </TouchableOpacity>
+        </Link>
+
+        <Link href="/profile/ranking" asChild>
+          <TouchableOpacity style={styles.menuItem}>
+            <Ionicons name="trophy-outline" size={24} color="#fff" />
+            <Text style={styles.menuItemText}>Ranking</Text>
+            <Ionicons name="chevron-forward" size={24} color="#8e8e93" />
+          </TouchableOpacity>
+        </Link>
+      </View>
+
+      {/* Settings */}
       <TouchableOpacity style={styles.menuItem}>
         <Ionicons name="settings-outline" size={24} color="#fff" />
         <Text style={styles.menuItemText}>Settings</Text>
@@ -92,6 +122,10 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
     color: '#8e8e93',
+  },
+  menuSection: {
+    gap: 12,
+    marginBottom: 16,
   },
   menuItem: {
     flexDirection: 'row',
