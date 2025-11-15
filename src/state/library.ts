@@ -111,3 +111,16 @@ export function isWatchlist(id: string): boolean {
   return watchlistIds.has(id);
 }
 
+// Get all IDs as arrays (for displaying in lists)
+export function getSeenIds(): string[] {
+  return Array.from(seenIds);
+}
+
+export function getWatchlistIds(): string[] {
+  return Array.from(watchlistIds);
+}
+
+export function getPassedIds(): string[] {
+  return Array.from(passedIds);
+}
+
