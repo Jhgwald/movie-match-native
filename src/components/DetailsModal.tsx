@@ -31,29 +31,23 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
   const [director, setDirector] = useState<string | null>(null);
   const [cast, setCast] = useState<string[]>([]);
   const [ratings, setRatings] = useState<MovieRatings>({});
-  const [currentMovieId, setCurrentMovieId] = useState<string>(movie.id);
 
-  // Reset state when movie.id changes
+  // Initialize state from movie prop on mount
+  // (key prop forces remount when movie changes, so this always has fresh data)
   useEffect(() => {
-    if (!movie) return;
-    
-    // Only reset if movie actually changed
-    if (movie.id !== currentMovieId) {
-      setCurrentMovieId(movie.id);
-      
-      // Reset all state immediately when movie changes
-      setEnrichedMovie(movie);
-      setRatings('ratings' in movie ? movie.ratings || {} : {});
-      setDirector(null);
-      setCast([]);
-      setLoading(false);
-    }
-  }, [movie.id]); // Only depend on movie.id to detect changes
+    setEnrichedMovie(movie);
+    setRatings('ratings' in movie ? movie.ratings || {} : {});
+    setDirector(null);
+    setCast([]);
+    setLoading(false);
+
+    console.log('[DetailsModal] Mounted/reset with movie:', movie.id, movie.title);
+  }, []); // Empty deps - only runs on mount (key prop handles movie changes)
   
   // Fetch additional details when modal becomes visible
   useEffect(() => {
     if (!visible || !movie || !HAS_TMDB) return;
-    
+
     const tmdbId = typeof movie.id === 'string' ? parseInt(movie.id) : movie.id;
     if (isNaN(tmdbId) || tmdbId <= 0) {
       // If we can't fetch from TMDb, just use the movie data we have
@@ -61,40 +55,32 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
-    const fetchId = movie.id; // Capture current movie ID for race condition checks
-    
+    console.log('[DetailsModal] Fetching TMDB details for:', tmdbId, movie.title);
+
     getDetailsWithCredits(tmdbId)
       .then((details) => {
-        // Verify this is still the current movie (prevent race conditions)
-        if (fetchId === movie.id) {
-          const updated = toMovie(movie, details);
-          setEnrichedMovie(updated);
-          setDirector(details.directorName);
-          setCast(details.castTop5);
-          
-          // Fetch OMDb ratings if we have IMDb ID
-          if (HAS_OMDB && details.imdbId) {
-            getOmdbRatingsByImdbId(details.imdbId).then((omdbRatings) => {
-              // Double-check movie hasn't changed during async call
-              if (fetchId === movie.id) {
-                setRatings(omdbRatings);
-              }
-            });
-          }
+        const updated = toMovie(movie, details);
+        setEnrichedMovie(updated);
+        setDirector(details.directorName);
+        setCast(details.castTop5);
+        console.log('[DetailsModal] TMDB fetch complete for:', movie.title);
+
+        // Fetch OMDb ratings if we have IMDb ID
+        if (HAS_OMDB && details.imdbId) {
+          getOmdbRatingsByImdbId(details.imdbId).then((omdbRatings) => {
+            setRatings(omdbRatings);
+          });
         }
       })
       .catch((error) => {
         console.error('Error fetching details:', error);
       })
       .finally(() => {
-        // Only stop loading if this is still the current movie
-        if (fetchId === movie.id) {
-          setLoading(false);
-        }
+        setLoading(false);
       });
-  }, [visible, movie.id]); // Fetch when modal opens or movie changes
+  }, [visible]); // Only fetch when modal becomes visible (key prop handles movie changes)
 
   const handleTrailer = async () => {
     if (enrichedMovie.trailer) {

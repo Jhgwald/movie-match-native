@@ -89,6 +89,7 @@ export default function MoviesToRankScreen() {
         {/* Details Modal */}
         {selectedMovie && (
           <DetailsModal
+            key={selectedMovie.id}
             visible={detailsVisible}
             movie={selectedMovie}
             onClose={() => {

@@ -89,6 +89,7 @@ export default function WatchlistScreen() {
         {/* Details Modal */}
         {selectedMovie && (
           <DetailsModal
+            key={selectedMovie.id}
             visible={detailsVisible}
             movie={selectedMovie}
             onClose={() => {
