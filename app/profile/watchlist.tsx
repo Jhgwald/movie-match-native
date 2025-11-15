@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Stack } from 'expo-router';
+import { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Stack, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import MovieCard from '../../src/components/MovieCard';
+import MovieListItem from '../../src/components/MovieListItem';
 import DetailsModal from '../../src/components/DetailsModal';
 import { getWatchlistIds } from '../../src/state/library';
 import { getMoviesByIds } from '../../src/lib/movieHelpers';
@@ -14,16 +14,23 @@ export default function WatchlistScreen() {
   const [selectedMovie, setSelectedMovie] = useState<Movie | MovieBase | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
 
-  // Load watchlist movies when the screen appears
-  useEffect(() => {
-    loadWatchlistMovies();
-  }, []);
+  // Reload watchlist movies every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[Watchlist] Screen focused, loading data...');
+      loadWatchlistMovies();
+    }, [])
+  );
 
   const loadWatchlistMovies = () => {
     // Get the IDs of movies the user has added to their watchlist
     const watchlistIds = getWatchlistIds();
+    console.log('[Watchlist] Watchlist IDs from library:', watchlistIds);
+
     // Convert those IDs into full movie objects
     const watchlistMovies = getMoviesByIds(watchlistIds);
+    console.log('[Watchlist] Loaded movies:', watchlistMovies.map(m => ({ id: m.id, title: m.title })));
+
     setMovies(watchlistMovies);
   };
 
@@ -68,15 +75,12 @@ export default function WatchlistScreen() {
 
             <View style={styles.movieList}>
               {movies.map((movie) => (
-                <TouchableOpacity
+                <MovieListItem
                   key={movie.id}
+                  movie={movie}
                   onPress={() => handleCardPress(movie)}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.cardWrapper}>
-                    <MovieCard movie={movie} borderColor="#4caf50" />
-                  </View>
-                </TouchableOpacity>
+                  borderColor="#4caf50"
+                />
               ))}
             </View>
           </ScrollView>
@@ -119,11 +123,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   movieList: {
-    gap: 16,
     paddingBottom: 32,
-  },
-  cardWrapper: {
-    marginBottom: 16,
   },
   emptyContainer: {
     flex: 1,

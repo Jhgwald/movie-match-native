@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Stack } from 'expo-router';
+import { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Stack, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import MovieCard from '../../src/components/MovieCard';
+import MovieListItem from '../../src/components/MovieListItem';
 import DetailsModal from '../../src/components/DetailsModal';
 import { getSeenIds } from '../../src/state/library';
 import { getMoviesByIds } from '../../src/lib/movieHelpers';
@@ -14,16 +14,23 @@ export default function MoviesToRankScreen() {
   const [selectedMovie, setSelectedMovie] = useState<Movie | MovieBase | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
 
-  // Load seen movies when the screen appears
-  useEffect(() => {
-    loadSeenMovies();
-  }, []);
+  // Reload seen movies every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[Movies to Rank] Screen focused, loading data...');
+      loadSeenMovies();
+    }, [])
+  );
 
   const loadSeenMovies = () => {
     // Get the IDs of movies the user has marked as "seen"
     const seenIds = getSeenIds();
+    console.log('[Movies to Rank] Seen IDs from library:', seenIds);
+
     // Convert those IDs into full movie objects
     const seenMovies = getMoviesByIds(seenIds);
+    console.log('[Movies to Rank] Loaded movies:', seenMovies.map(m => ({ id: m.id, title: m.title })));
+
     setMovies(seenMovies);
   };
 
@@ -68,15 +75,12 @@ export default function MoviesToRankScreen() {
 
             <View style={styles.movieList}>
               {movies.map((movie) => (
-                <TouchableOpacity
+                <MovieListItem
                   key={movie.id}
+                  movie={movie}
                   onPress={() => handleCardPress(movie)}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.cardWrapper}>
-                    <MovieCard movie={movie} borderColor="#FFFEAD" />
-                  </View>
-                </TouchableOpacity>
+                  borderColor="#FFFEAD"
+                />
               ))}
             </View>
           </ScrollView>
@@ -119,11 +123,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   movieList: {
-    gap: 16,
     paddingBottom: 32,
-  },
-  cardWrapper: {
-    marginBottom: 16,
   },
   emptyContainer: {
     flex: 1,
