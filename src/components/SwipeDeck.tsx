@@ -389,6 +389,7 @@ export default function SwipeDeck({
       case 'right':
         // Right = Seen → Yellow border, arc to Profile
         setCardBorderColor('#FFD700'); // Yellow for Seen
+        console.log('[SwipeDeck] CALLING onSwipeRight with movie:', movie.id, movie.title);
         onSwipeRight?.(movie);
         const { x: seenTargetX, y: seenTargetY } = getProfileTargetOffset();
         throwCardIntoTarget(seenTargetX, seenTargetY).then(finishProfileCatch);
@@ -396,11 +397,13 @@ export default function SwipeDeck({
       case 'left':
         // Left = Pass → Red, slide off left
         x = -SCREEN_WIDTH * 1.5;
+        console.log('[SwipeDeck] CALLING onSwipeLeft with movie:', movie.id, movie.title);
         onSwipeLeft?.(movie);
         break;
       case 'up':
         // Up = Watchlist → Green border, arc to Profile
         setCardBorderColor('#4caf50'); // Green for Watchlist
+        console.log('[SwipeDeck] CALLING onSwipeUp with movie:', movie.id, movie.title);
         onSwipeUp?.(movie);
         const { x: watchlistTargetX, y: watchlistTargetY } = getProfileTargetOffset();
         throwCardIntoTarget(watchlistTargetX, watchlistTargetY, {
@@ -416,6 +419,7 @@ export default function SwipeDeck({
         // Down = Seen + Show Details → Yellow, animate down then reset (no advance)
         setCardBorderColor('#FFD700'); // Yellow for Seen
         y = SCREEN_HEIGHT * 0.3;
+        console.log('[SwipeDeck] CALLING onSwipeDown with movie:', movie.id, movie.title);
         onSwipeDown?.(movie);
         shouldAdvance = false;
         // Animate down then reset
