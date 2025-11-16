@@ -7,7 +7,13 @@ import DetailsModal from '../../src/components/DetailsModal';
 import { movies as sampleMovies } from '../../src/data/sample/movies';
 import { getTrendingMovies } from '../../src/services/tmdb';
 import { HAS_TMDB } from '../../src/config/env';
-import { markSeen, markSkipped, markWatchlist } from '../../src/state/library';
+import {
+  markSeen,
+  markSkipped,
+  markWatchlist,
+  getSeenIds,
+  getWatchlistIds,
+} from '../../src/state/library';
 import type { Movie, MovieBase } from '../../src/types/movie';
 import { useProfileTabAnimation } from '../../src/context/ProfileTabAnimationContext';
 
@@ -53,10 +59,10 @@ export default function FeedScreen() {
   };
 
   const handleSwipeRight = (movie: MovieBase | Movie) => {
-    // Right = Like → Mark as SEEN → Add to Movies to Rank
-    console.log('[Feed] handleSwipeRight RECEIVED movie:', movie.id, movie.title);
-    console.log('[Feed] handleSwipeRight movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
-    markSeen(movie.id);
+    // Right = Watchlist 🔖
+    console.log('[Feed] handleSwipeRight → Watchlist for movie:', movie.id, movie.title);
+    markWatchlist(movie.id);
+    console.log('[Feed] watchlistIds now:', getWatchlistIds());
   };
 
   const handleSwipeLeft = (movie: MovieBase | Movie) => {
@@ -68,10 +74,10 @@ export default function FeedScreen() {
   };
 
   const handleSwipeUp = (movie: MovieBase | Movie) => {
-    // Up = Add to WATCHLIST (not Seen)
-    console.log('[Feed] handleSwipeUp RECEIVED movie:', movie.id, movie.title);
-    console.log('[Feed] handleSwipeUp movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
-    markWatchlist(movie.id);
+    // Up = Seen ✅ → Movies to Rank
+    console.log('[Feed] handleSwipeUp → Seen/MoviesToRank for movie:', movie.id, movie.title);
+    markSeen(movie.id);
+    console.log('[Feed] seenIds now:', getSeenIds());
   };
 
   const handleSwipeDown = (movie: MovieBase | Movie) => {
