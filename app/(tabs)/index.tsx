@@ -53,27 +53,40 @@ export default function FeedScreen() {
   };
 
   const handleSwipeRight = (movie: MovieBase | Movie) => {
-    // Right = Watchlist 🔖
-    markWatchlist(movie.id);
+    // Right = Like → Mark as SEEN → Add to Movies to Rank
+    console.log('[Feed] handleSwipeRight RECEIVED movie:', movie.id, movie.title);
+    console.log('[Feed] handleSwipeRight movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
+    markSeen(movie.id);
   };
 
   const handleSwipeLeft = (movie: MovieBase | Movie) => {
-    // Left = Pass 🚫
+    // Left = Skip → Do not add anywhere
+    console.log('[Feed] handleSwipeLeft RECEIVED movie:', movie.id, movie.title);
+    console.log('[Feed] handleSwipeLeft movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
     markPassed(movie.id);
   };
 
   const handleSwipeUp = (movie: MovieBase | Movie) => {
-    // Up = Seen ✅
-    markSeen(movie.id);
+    // Up = Add to WATCHLIST (not Seen)
+    console.log('[Feed] handleSwipeUp RECEIVED movie:', movie.id, movie.title);
+    console.log('[Feed] handleSwipeUp movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
+    markWatchlist(movie.id);
   };
 
   const handleSwipeDown = (movie: MovieBase | Movie) => {
-    // Down = Details (don't advance card, just show modal)
+    // Down = Mark as SEEN + Show Details
+    console.log('[Feed] handleSwipeDown RECEIVED movie:', movie.id, movie.title);
+    console.log('[Feed] handleSwipeDown movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
+    markSeen(movie.id);
+    console.log('[Feed] Calling setSelectedMovie with:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };
 
   const handleDetails = (movie: MovieBase | Movie) => {
+    console.log('[Feed] handleDetails RECEIVED movie:', movie.id, movie.title);
+    console.log('[Feed] handleDetails movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
+    console.log('[Feed] Calling setSelectedMovie with:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };
