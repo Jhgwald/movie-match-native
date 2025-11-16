@@ -79,7 +79,10 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
       .finally(() => {
         setLoading(false);
       });
-  }, [visible]); // Only fetch when modal becomes visible (key prop handles movie changes)
+  }, [visible, movie.id]); // CRITICAL FIX: Added movie.id to dependencies
+
+  // Log what's being rendered
+  console.log('[DetailsModal] Rendering modal for:', enrichedMovie.id, enrichedMovie.title);
 
   const handleTrailer = async () => {
     if (enrichedMovie.trailer) {

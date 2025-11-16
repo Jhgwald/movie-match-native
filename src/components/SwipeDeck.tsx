@@ -376,8 +376,11 @@ export default function SwipeDeck({
     if (isAnimating.current || currentIndex >= movies.length) return;
 
     isAnimating.current = true;
+    console.log(`[SwipeDeck] currentIndex:`, currentIndex, `movies.length:`, movies.length);
     const movie = movies[currentIndex];
     console.log(`[SwipeDeck] Swipe ${direction} on movie:`, movie.id, movie.title, `(index: ${currentIndex})`);
+    console.log(`[SwipeDeck] Full movie object:`, JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
+    console.log(`[SwipeDeck] First 3 movies in array:`, movies.slice(0, 3).map(m => ({ id: m.id, title: m.title })));
     let x = 0;
     let y = 0;
     let shouldAdvance = true;
@@ -504,6 +507,7 @@ export default function SwipeDeck({
   const nextCard = () => {
     setCurrentIndex((prev) => {
       const next = prev + 1;
+      console.log(`[SwipeDeck] nextCard: ${prev} → ${next} (total: ${movies.length})`);
       if (next < movies.length) {
         // Keep animation flag true during slide-up
         isAnimating.current = true;
