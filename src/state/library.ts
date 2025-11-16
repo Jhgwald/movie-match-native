@@ -1,8 +1,8 @@
-// In-memory library state for tracking seen, passed, and watchlist movies
+// In-memory library state for tracking seen, skipped, and watchlist movies
 // Optional persistence with AsyncStorage if available
 
 let seenIds = new Set<string>();
-let passedIds = new Set<string>();
+let skippedIds = new Set<string>();
 let watchlistIds = new Set<string>();
 
 // Try to import AsyncStorage (optional dependency) - lazy load to avoid blocking
@@ -20,23 +20,23 @@ const getAsyncStorage = () => {
 
 const STORAGE_KEYS = {
   SEEN: '@moviematch:seen',
-  PASSED: '@moviematch:passed',
+  SKIPPED: '@moviematch:skipped',
   WATCHLIST: '@moviematch:watchlist',
 };
 
 async function loadFromStorage(): Promise<void> {
   const storage = getAsyncStorage();
   if (!storage) return;
-  
+
   try {
-    const [seen, passed, watchlist] = await Promise.all([
+    const [seen, skipped, watchlist] = await Promise.all([
       storage.getItem(STORAGE_KEYS.SEEN),
-      storage.getItem(STORAGE_KEYS.PASSED),
+      storage.getItem(STORAGE_KEYS.SKIPPED),
       storage.getItem(STORAGE_KEYS.WATCHLIST),
     ]);
-    
+
     if (seen) seenIds = new Set(JSON.parse(seen));
-    if (passed) passedIds = new Set(JSON.parse(passed));
+    if (skipped) skippedIds = new Set(JSON.parse(skipped));
     if (watchlist) watchlistIds = new Set(JSON.parse(watchlist));
   } catch (error) {
     console.warn('Failed to load library state from storage:', error);
@@ -46,11 +46,11 @@ async function loadFromStorage(): Promise<void> {
 async function saveToStorage(): Promise<void> {
   const storage = getAsyncStorage();
   if (!storage) return;
-  
+
   try {
     await Promise.all([
       storage.setItem(STORAGE_KEYS.SEEN, JSON.stringify(Array.from(seenIds))),
-      storage.setItem(STORAGE_KEYS.PASSED, JSON.stringify(Array.from(passedIds))),
+      storage.setItem(STORAGE_KEYS.SKIPPED, JSON.stringify(Array.from(skippedIds))),
       storage.setItem(STORAGE_KEYS.WATCHLIST, JSON.stringify(Array.from(watchlistIds))),
     ]);
   } catch (error) {
@@ -65,23 +65,23 @@ loadFromStorage().catch(() => {
 
 export function markSeen(id: string): void {
   seenIds.add(id);
-  passedIds.delete(id);
+  skippedIds.delete(id);
   watchlistIds.delete(id);
   console.log(`[Library] markSeen('${id}') - seenIds now:`, Array.from(seenIds));
   saveToStorage();
 }
 
-export function markPassed(id: string): void {
-  passedIds.add(id);
+export function markSkipped(id: string): void {
+  skippedIds.add(id);
   seenIds.delete(id);
   watchlistIds.delete(id);
-  console.log(`[Library] markPassed('${id}') - passedIds now:`, Array.from(passedIds));
+  console.log(`[Library] markSkipped('${id}') - skippedIds now:`, Array.from(skippedIds));
   saveToStorage();
 }
 
 export function markWatchlist(id: string): void {
   watchlistIds.add(id);
-  passedIds.delete(id);
+  skippedIds.delete(id);
   // Don't remove from seen - you can watchlist something you've seen
   console.log(`[Library] markWatchlist('${id}') - watchlistIds now:`, Array.from(watchlistIds));
   saveToStorage();
@@ -89,15 +89,15 @@ export function markWatchlist(id: string): void {
 
 export function resetAll(): void {
   seenIds.clear();
-  passedIds.clear();
+  skippedIds.clear();
   watchlistIds.clear();
   saveToStorage();
 }
 
-export function counts(): { seen: number; passed: number; watchlist: number } {
+export function counts(): { seen: number; skipped: number; watchlist: number } {
   return {
     seen: seenIds.size,
-    passed: passedIds.size,
+    skipped: skippedIds.size,
     watchlist: watchlistIds.size,
   };
 }
@@ -106,8 +106,8 @@ export function isSeen(id: string): boolean {
   return seenIds.has(id);
 }
 
-export function isPassed(id: string): boolean {
-  return passedIds.has(id);
+export function isSkipped(id: string): boolean {
+  return skippedIds.has(id);
 }
 
 export function isWatchlist(id: string): boolean {
@@ -123,7 +123,7 @@ export function getWatchlistIds(): string[] {
   return Array.from(watchlistIds);
 }
 
-export function getPassedIds(): string[] {
-  return Array.from(passedIds);
+export function getSkippedIds(): string[] {
+  return Array.from(skippedIds);
 }
 

@@ -7,7 +7,7 @@ import DetailsModal from '../../src/components/DetailsModal';
 import { movies as sampleMovies } from '../../src/data/sample/movies';
 import { getTrendingMovies } from '../../src/services/tmdb';
 import { HAS_TMDB } from '../../src/config/env';
-import { markSeen, markPassed, markWatchlist } from '../../src/state/library';
+import { markSeen, markSkipped, markWatchlist } from '../../src/state/library';
 import type { Movie, MovieBase } from '../../src/types/movie';
 import { useProfileTabAnimation } from '../../src/context/ProfileTabAnimationContext';
 
@@ -60,10 +60,11 @@ export default function FeedScreen() {
   };
 
   const handleSwipeLeft = (movie: MovieBase | Movie) => {
-    // Left = Skip → Do not add anywhere
+    // Left = Skipped 🚫
     console.log('[Feed] handleSwipeLeft RECEIVED movie:', movie.id, movie.title);
     console.log('[Feed] handleSwipeLeft movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
-    markPassed(movie.id);
+    console.log(`[Feed] Swipe LEFT (Skipped): ${movie.id} ${movie.title}`);
+    markSkipped(movie.id);
   };
 
   const handleSwipeUp = (movie: MovieBase | Movie) => {
