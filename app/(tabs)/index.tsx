@@ -9,7 +9,13 @@ import FeedSettingsModal from '../../src/components/FeedSettingsModal';
 import { movies as sampleMovies } from '../../src/data/sample/movies';
 import { getTrendingMovies } from '../../src/services/tmdb';
 import { HAS_TMDB } from '../../src/config/env';
-import { markSeen, markPassed, markWatchlist } from '../../src/state/library';
+import {
+  markSeen,
+  markSkipped,
+  markWatchlist,
+  getSeenIds,
+  getWatchlistIds,
+} from '../../src/state/library';
 import type { Movie, MovieBase } from '../../src/types/movie';
 import { useProfileTabAnimation } from '../../src/context/ProfileTabAnimationContext';
 import { FeedPreferencesProvider, useFeedPreferences } from '../../src/context/FeedPreferencesContext';
@@ -59,17 +65,24 @@ function FeedContent() {
 
   const handleSwipeRight = (movie: MovieBase | Movie) => {
     // Right = Watchlist 🔖
+    console.log('[Feed] handleSwipeRight → Watchlist for movie:', movie.id, movie.title);
     markWatchlist(movie.id);
+    console.log('[Feed] watchlistIds now:', getWatchlistIds());
   };
 
   const handleSwipeLeft = (movie: MovieBase | Movie) => {
-    // Left = Pass 🚫
-    markPassed(movie.id);
+    // Left = Skipped 🚫
+    console.log('[Feed] handleSwipeLeft RECEIVED movie:', movie.id, movie.title);
+    console.log('[Feed] handleSwipeLeft movie object:', JSON.stringify({ id: movie.id, title: movie.title, year: movie.year }));
+    console.log(`[Feed] Swipe LEFT (Skipped): ${movie.id} ${movie.title}`);
+    markSkipped(movie.id);
   };
 
   const handleSwipeUp = (movie: MovieBase | Movie) => {
-    // Up = Seen ✅
+    // Up = Seen ✅ → Movies to Rank
+    console.log('[Feed] handleSwipeUp → Seen/MoviesToRank for movie:', movie.id, movie.title);
     markSeen(movie.id);
+    console.log('[Feed] seenIds now:', getSeenIds());
   };
 
   const handleSwipeDown = (movie: MovieBase | Movie) => {
@@ -80,6 +93,7 @@ function FeedContent() {
   };
 
   const handleDetails = (movie: MovieBase | Movie) => {
+    // Open details from other UI actions (e.g. button/tap)
     console.log('[Details] opening modal for movie:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);

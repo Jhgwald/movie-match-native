@@ -49,17 +49,18 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
   // Fetch additional details when modal becomes visible or movie changes
   useEffect(() => {
     if (!visible || !movie || !HAS_TMDB) return;
-    
+
     const tmdbId = typeof movie.id === 'string' ? parseInt(movie.id) : movie.id;
     if (isNaN(tmdbId) || tmdbId <= 0) {
       // If we can't fetch from TMDb, just use the movie data we have
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     const fetchId = movie.id; // Capture current movie ID for race condition checks
-    
+    console.log('[DetailsModal] Fetching TMDB details for:', tmdbId, movie.title);
+
     getDetailsWithCredits(tmdbId)
       .then((details) => {
         // Verify this is still the current movie (prevent race conditions)

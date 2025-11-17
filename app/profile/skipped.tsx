@@ -5,37 +5,36 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import MovieListItem from '../../src/components/MovieListItem';
 import DetailsModal from '../../src/components/DetailsModal';
-import { getWatchlistIds } from '../../src/state/library';
+import { getSkippedIds } from '../../src/state/library';
 import { getMoviesByIds } from '../../src/lib/movieHelpers';
 import type { Movie, MovieBase } from '../../src/types/movie';
 
-export default function WatchlistScreen() {
+export default function SkippedScreen() {
   const [movies, setMovies] = useState<(Movie | MovieBase)[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | MovieBase | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
 
-  // Reload watchlist movies every time the screen comes into focus
+  // Reload skipped movies every time the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('[Watchlist] Screen focused, loading data...');
-      loadWatchlistMovies();
+      console.log('[Skipped] Screen focused, loading data...');
+      loadSkippedMovies();
     }, [])
   );
 
-  const loadWatchlistMovies = () => {
-    // Get the IDs of movies the user has added to their watchlist
-    const watchlistIds = getWatchlistIds();
-    console.log('[Watchlist] Watchlist IDs from library:', watchlistIds);
+  const loadSkippedMovies = () => {
+    // Get the IDs of movies the user has skipped
+    const skippedIds = getSkippedIds();
+    console.log('[Skipped] Skipped IDs from library:', skippedIds);
 
     // Convert those IDs into full movie objects
-    const watchlistMovies = getMoviesByIds(watchlistIds);
-    console.log('[Watchlist] Loaded movies:', watchlistMovies.map(m => ({ id: m.id, title: m.title })));
+    const skippedMovies = getMoviesByIds(skippedIds);
+    console.log('[Skipped] Loaded movies:', skippedMovies.map(m => ({ id: m.id, title: m.title })));
 
-    setMovies(watchlistMovies);
+    setMovies(skippedMovies);
   };
 
   const handleCardPress = (movie: Movie | MovieBase) => {
-    console.log('[Watchlist] Opening details for:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };
@@ -45,7 +44,7 @@ export default function WatchlistScreen() {
       {/* Configure the header for this screen */}
       <Stack.Screen
         options={{
-          title: 'Your Watchlist',
+          title: 'Skipped Movies',
           headerStyle: { backgroundColor: '#7E1616' },
           headerTintColor: '#FFFEAD',
         }}
@@ -55,23 +54,23 @@ export default function WatchlistScreen() {
         <StatusBar style="light" />
 
         {movies.length === 0 ? (
-          // Empty state - no movies in watchlist yet
+          // Empty state - no skipped movies yet
           <View style={styles.emptyContainer}>
-            <Ionicons name="bookmark-outline" size={64} color="#8e8e93" />
-            <Text style={styles.emptyTitle}>Your Watchlist is Empty</Text>
+            <Ionicons name="close-circle-outline" size={64} color="#8e8e93" />
+            <Text style={styles.emptyTitle}>No Skipped Movies</Text>
             <Text style={styles.emptyText}>
-              Swipe right on movies in the Feed to add them to your watchlist.
+              Movies you swipe left on will appear here.
             </Text>
             <Text style={styles.emptySubtext}>
-              Keep track of movies you want to watch!
+              Keep track of movies you're not interested in!
             </Text>
           </View>
         ) : (
-          // List of watchlist movies
+          // List of skipped movies
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <Text style={styles.title}>Your Watchlist</Text>
+            <Text style={styles.title}>Skipped Movies</Text>
             <Text style={styles.subtitle}>
-              {movies.length} {movies.length === 1 ? 'movie' : 'movies'} to watch
+              {movies.length} {movies.length === 1 ? 'movie' : 'movies'} skipped
             </Text>
 
             <View style={styles.movieList}>
@@ -80,7 +79,7 @@ export default function WatchlistScreen() {
                   key={movie.id}
                   movie={movie}
                   onPress={() => handleCardPress(movie)}
-                  borderColor="#4caf50"
+                  borderColor="#DC2026"
                 />
               ))}
             </View>
@@ -90,7 +89,6 @@ export default function WatchlistScreen() {
         {/* Details Modal */}
         {selectedMovie && (
           <DetailsModal
-            key={selectedMovie.id}
             visible={detailsVisible}
             movie={selectedMovie}
             onClose={() => {

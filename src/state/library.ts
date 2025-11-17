@@ -1,8 +1,8 @@
-// In-memory library state for tracking seen, passed, and watchlist movies
+// In-memory library state for tracking seen, skipped, and watchlist movies
 // Optional persistence with AsyncStorage if available
 
 let seenIds = new Set<string>();
-let passedIds = new Set<string>();
+let skippedIds = new Set<string>();
 let watchlistIds = new Set<string>();
 
 // Try to import AsyncStorage (optional dependency) - lazy load to avoid blocking
@@ -18,41 +18,114 @@ const getAsyncStorage = () => {
   return AsyncStorage || null;
 };
 
-const STORAGE_KEYS = {
-  SEEN: '@moviematch:seen',
-  PASSED: '@moviematch:passed',
-  WATCHLIST: '@moviematch:watchlist',
-};
+// New versioned storage key - all buckets stored together
+const LIBRARY_STORAGE_KEY = '@moviematch:library-v2';
+
+// Old storage keys (deprecated - no longer used, kept for reference)
+// These were used by earlier versions and are now ignored:
+// '@moviematch:seen'
+// '@moviematch:skipped'
+// '@moviematch:watchlist'
+
+/**
+ * Enforces that each movie ID can only exist in exactly one bucket.
+ * Priority: skippedIds > seenIds > watchlistIds
+ * 
+ * - If ID is in skippedIds → remove it from seenIds and watchlistIds
+ * - Else if ID is in seenIds → remove it from watchlistIds
+ * - Else if ID is only in watchlistIds → leave it there
+ */
+function enforceExclusiveBuckets(): void {
+  // Create working copies
+  const skipped = new Set(skippedIds);
+  const seen = new Set(seenIds);
+  const watchlist = new Set(watchlistIds);
+
+  // 1) Skipped wins: remove from other sets
+  skipped.forEach(id => {
+    seen.delete(id);
+    watchlist.delete(id);
+  });
+
+  // 2) Seen next: remove from watchlist
+  seen.forEach(id => {
+    watchlist.delete(id);
+  });
+
+  // Update the global state
+  seenIds = seen;
+  skippedIds = skipped;
+  watchlistIds = watchlist;
+}
 
 async function loadFromStorage(): Promise<void> {
   const storage = getAsyncStorage();
-  if (!storage) return;
-  
+  if (!storage) {
+    console.log('[Library] AsyncStorage not available, starting with empty buckets');
+    // Initialize with empty buckets even if storage is unavailable
+    seenIds = new Set<string>();
+    skippedIds = new Set<string>();
+    watchlistIds = new Set<string>();
+    return;
+  }
+
   try {
-    const [seen, passed, watchlist] = await Promise.all([
-      storage.getItem(STORAGE_KEYS.SEEN),
-      storage.getItem(STORAGE_KEYS.PASSED),
-      storage.getItem(STORAGE_KEYS.WATCHLIST),
-    ]);
+    // Log which key we are using
+    console.log('[Library] Loading from key:', LIBRARY_STORAGE_KEY);
     
-    if (seen) seenIds = new Set(JSON.parse(seen));
-    if (passed) passedIds = new Set(JSON.parse(passed));
-    if (watchlist) watchlistIds = new Set(JSON.parse(watchlist));
+    // DEVELOPMENT MODE: Always clear the key on startup to start fresh
+    // This ensures each app launch starts with an empty library
+    await storage.removeItem(LIBRARY_STORAGE_KEY);
+    console.log('[Library] Cleared storage key for fresh start');
+    
+    // Always start with empty buckets (no saved state loaded)
+    seenIds = new Set<string>();
+    skippedIds = new Set<string>();
+    watchlistIds = new Set<string>();
+    
+    // Enforce exclusivity (no-op on empty sets, but keeps code consistent)
+    enforceExclusiveBuckets();
+    
+    // Log the final loaded state (always empty on startup)
+    const finalState = {
+      seenIds: Array.from(seenIds),
+      skippedIds: Array.from(skippedIds),
+      watchlistIds: Array.from(watchlistIds),
+    };
+    console.log('[Library] Final loaded state (fresh start):', JSON.stringify(finalState));
+    
+    // Save the empty state to storage (ensures clean state is persisted)
+    await saveToStorage();
   } catch (error) {
-    console.warn('Failed to load library state from storage:', error);
+    console.warn('Failed to initialize library state:', error);
+    // On error, start with empty buckets
+    seenIds = new Set<string>();
+    skippedIds = new Set<string>();
+    watchlistIds = new Set<string>();
+    
+    // Log the final loaded state (empty due to error)
+    const finalState = {
+      seenIds: Array.from(seenIds),
+      skippedIds: Array.from(skippedIds),
+      watchlistIds: Array.from(watchlistIds),
+    };
+    console.log('[Library] Final loaded state (after error):', JSON.stringify(finalState));
   }
 }
 
 async function saveToStorage(): Promise<void> {
   const storage = getAsyncStorage();
   if (!storage) return;
-  
+
   try {
-    await Promise.all([
-      storage.setItem(STORAGE_KEYS.SEEN, JSON.stringify(Array.from(seenIds))),
-      storage.setItem(STORAGE_KEYS.PASSED, JSON.stringify(Array.from(passedIds))),
-      storage.setItem(STORAGE_KEYS.WATCHLIST, JSON.stringify(Array.from(watchlistIds))),
-    ]);
+    // Save all buckets together in a single object using the new versioned key
+    const libraryState = {
+      seenIds: Array.from(seenIds),
+      skippedIds: Array.from(skippedIds),
+      watchlistIds: Array.from(watchlistIds),
+    };
+    
+    await storage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(libraryState));
   } catch (error) {
     console.warn('Failed to save library state to storage:', error);
   }
@@ -64,40 +137,55 @@ loadFromStorage().catch(() => {
 });
 
 export function markSeen(id: string): void {
+  // Add to seenIds and remove from other buckets
   seenIds.add(id);
-  passedIds.delete(id);
+  skippedIds.delete(id);
   watchlistIds.delete(id);
+  
+  // Enforce exclusivity (defensive - ensures no overlaps)
+  enforceExclusiveBuckets();
+  
   console.log(`[Library] markSeen('${id}') - seenIds now:`, Array.from(seenIds));
   saveToStorage();
 }
 
-export function markPassed(id: string): void {
-  passedIds.add(id);
+export function markSkipped(id: string): void {
+  // Add to skippedIds and remove from other buckets
+  skippedIds.add(id);
   seenIds.delete(id);
   watchlistIds.delete(id);
-  console.log(`[Library] markPassed('${id}') - passedIds now:`, Array.from(passedIds));
+  
+  // Enforce exclusivity (defensive - ensures no overlaps)
+  enforceExclusiveBuckets();
+  
+  console.log(`[Library] markSkipped('${id}') - skippedIds now:`, Array.from(skippedIds));
   saveToStorage();
 }
 
 export function markWatchlist(id: string): void {
+  // Add to watchlistIds and remove from other buckets
   watchlistIds.add(id);
-  passedIds.delete(id);
-  // Don't remove from seen - you can watchlist something you've seen
+  skippedIds.delete(id);
+  seenIds.delete(id);
+  
+  // Enforce exclusivity (defensive - ensures no overlaps)
+  enforceExclusiveBuckets();
+  
   console.log(`[Library] markWatchlist('${id}') - watchlistIds now:`, Array.from(watchlistIds));
   saveToStorage();
 }
 
 export function resetAll(): void {
   seenIds.clear();
-  passedIds.clear();
+  skippedIds.clear();
   watchlistIds.clear();
   saveToStorage();
 }
 
-export function counts(): { seen: number; passed: number; watchlist: number } {
+export function counts(): { seen: number; skipped: number; watchlist: number } {
   return {
     seen: seenIds.size,
-    passed: passedIds.size,
+    skipped: skippedIds.size,
     watchlist: watchlistIds.size,
   };
 }
@@ -106,8 +194,8 @@ export function isSeen(id: string): boolean {
   return seenIds.has(id);
 }
 
-export function isPassed(id: string): boolean {
-  return passedIds.has(id);
+export function isSkipped(id: string): boolean {
+  return skippedIds.has(id);
 }
 
 export function isWatchlist(id: string): boolean {
@@ -123,7 +211,7 @@ export function getWatchlistIds(): string[] {
   return Array.from(watchlistIds);
 }
 
-export function getPassedIds(): string[] {
-  return Array.from(passedIds);
+export function getSkippedIds(): string[] {
+  return Array.from(skippedIds);
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -105,6 +105,15 @@ export default function SwipeDeck({
     x: SCREEN_WIDTH / 2,
     y: SCREEN_HEIGHT / 2,
   });
+
+  // Refs to always access the latest handler functions (fixes stale closure issue)
+  const handleSwipeRef = useRef<(direction: 'left' | 'right' | 'up' | 'down') => void>(() => {});
+  const resetPositionRef = useRef<() => void>(() => {});
+
+  // Debug logging for currentIndex changes
+  useEffect(() => {
+    console.log(`[SwipeDeck] currentIndex changed to: ${currentIndex}, movies.length: ${movies.length}`);
+  }, [currentIndex, movies.length]);
 
   const updateCardCenter = useCallback(() => {
     if (!cardRef.current) return;
@@ -362,11 +371,11 @@ export default function SwipeDeck({
           labelOpacity.setValue(0);
           labelDirection.current = null;
         }
-        
+
         if (swipeDirection) {
-          handleSwipe(swipeDirection);
+          handleSwipeRef.current(swipeDirection);
         } else {
-          resetPosition();
+          resetPositionRef.current();
         }
       },
     })
@@ -374,9 +383,11 @@ export default function SwipeDeck({
 
   const handleSwipe = (direction: 'left' | 'right' | 'up' | 'down') => {
     if (isAnimating.current || currentIndex >= movies.length) return;
-    
+
     isAnimating.current = true;
     const movie = movies[currentIndex];
+    console.log(`[SwipeDeck] Swipe ${direction} on movie: ${movie.id} ${movie.title} (index: ${currentIndex})`);
+
     let x = 0;
     let y = 0;
     let shouldAdvance = true;
@@ -503,8 +514,10 @@ export default function SwipeDeck({
   };
 
   const nextCard = () => {
+    console.log(`[SwipeDeck] nextCard called, currentIndex before: ${currentIndex}`);
     setCurrentIndex((prev) => {
       const next = prev + 1;
+      console.log(`[SwipeDeck] nextCard: ${prev} → ${next} (total: ${movies.length})`);
       if (next < movies.length) {
         // Keep animation flag true during slide-up
         isAnimating.current = true;
@@ -556,6 +569,8 @@ export default function SwipeDeck({
       }
       return next;
     });
+    // Note: The state update above is async, so currentIndex won't reflect the new value immediately
+    console.log(`[SwipeDeck] nextCard complete, currentIndex will update to next value on next render`);
   };
 
   const getCardStyle = (index: number) => {
@@ -655,6 +670,11 @@ export default function SwipeDeck({
         return null;
     }
   };
+
+  // Update refs to always point to the latest functions with current closures
+  // This fixes the stale closure issue in panResponder
+  handleSwipeRef.current = handleSwipe;
+  resetPositionRef.current = resetPosition;
 
   const renderCard = (movie: MovieBase | Movie, index: number) => {
     if (index < currentIndex) return null;

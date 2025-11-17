@@ -48,6 +48,14 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </Link>
 
+        <Link href="/profile/skipped" asChild>
+          <TouchableOpacity style={styles.menuItem}>
+            <Ionicons name="close-circle-outline" size={24} color="#8e8e93" />
+            <Text style={styles.menuItemText}>Skipped Movies</Text>
+            <Ionicons name="chevron-forward" size={24} color="#8e8e93" />
+          </TouchableOpacity>
+        </Link>
+
         <Link href="/profile/ranking" asChild>
           <TouchableOpacity style={styles.menuItem}>
             <Ionicons name="trophy-outline" size={24} color="#fff" />
