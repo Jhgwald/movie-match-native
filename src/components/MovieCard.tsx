@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Image, Dimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Movie, MovieBase } from '../types/movie';
+import { useFeedPreferences } from '../context/FeedPreferencesContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TICKET_MAX_WIDTH = Math.min(SCREEN_WIDTH - 32, 400);
@@ -25,12 +26,15 @@ export default function MovieCard({
   borderColor = '#A0452E', // Dark brown/red border
   maxHeight,
 }: MovieCardProps) {
+  const { feedPreferences } = useFeedPreferences();
+  const { ticketLayout } = feedPreferences;
+
   const hasRatings = 'ratings' in movie && !!movie.ratings;
   const imdbRating = hasRatings ? movie.ratings?.imdb : undefined;
   const rtRating = hasRatings ? movie.ratings?.rtCritics : undefined;
-  
+
   // Calculate Friend Score (average of IMDb and RT, or use tmdbRating as fallback)
-  const friendScore = imdbRating && rtRating 
+  const friendScore = imdbRating && rtRating
     ? Math.round((imdbRating * 10 + rtRating) / 2)
     : Math.round(movie.tmdbRating * 10);
 
@@ -64,7 +68,7 @@ export default function MovieCard({
               {/* Poster and Ratings Row */}
               <View style={styles.posterRatingsRow}>
                 {/* Poster - Left side */}
-                <View style={styles.posterContainer}>
+                <View style={[styles.posterContainer, !ticketLayout.showScores && styles.posterFullWidth]}>
                   {movie.poster ? (
                     <Image
                       source={{ uri: movie.poster }}
@@ -79,61 +83,87 @@ export default function MovieCard({
                 </View>
 
                 {/* Ratings - Vertical stack to the right (4 ratings only) */}
-                <View style={styles.ratingsColumn}>
-                  {/* IMDb - Yellow background, black text */}
-                  {imdbRating !== undefined && typeof imdbRating === 'number' ? (
-                    <View style={[styles.ratingBubble, styles.imdbBubble]}>
-                      <Text style={[styles.ratingBubbleLabel, styles.darkText]}>IMDb</Text>
-                      <Text style={[styles.ratingBubbleValue, styles.darkText]}>{Math.round(imdbRating * 10)}%</Text>
+                {ticketLayout.showScores && (
+                  <View style={styles.ratingsColumn}>
+                    {/* IMDb - Yellow background, black text */}
+                    {imdbRating !== undefined && typeof imdbRating === 'number' ? (
+                      <View style={[styles.ratingBubble, styles.imdbBubble]}>
+                        <Text style={[styles.ratingBubbleLabel, styles.darkText]}>IMDb</Text>
+                        <Text style={[styles.ratingBubbleValue, styles.darkText]}>{Math.round(imdbRating * 10)}%</Text>
+                      </View>
+                    ) : null}
+
+                    {/* Rotten Tomatoes - Red background, white text */}
+                    {rtRating !== undefined && typeof rtRating === 'number' ? (
+                      <View style={[styles.ratingBubble, styles.rtBubble]}>
+                        <Text style={[styles.ratingBubbleLabel, styles.lightText]}>Rotten Tomatoes</Text>
+                        <Text style={[styles.ratingBubbleValue, styles.lightText]}>{Math.round(rtRating)}%</Text>
+                      </View>
+                    ) : null}
+
+                    {/* Friend Score - Blue background, white text */}
+                    <View style={[styles.ratingBubble, styles.friendBubble]}>
+                      <Text style={[styles.ratingBubbleLabel, styles.lightText]}>Friend Score</Text>
+                      <Text style={[styles.ratingBubbleValue, styles.lightText]}>{friendScore}%</Text>
                     </View>
-                  ) : null}
-                  
-                  {/* Rotten Tomatoes - Red background, white text */}
-                  {rtRating !== undefined && typeof rtRating === 'number' ? (
-                    <View style={[styles.ratingBubble, styles.rtBubble]}>
-                      <Text style={[styles.ratingBubbleLabel, styles.lightText]}>Rotten Tomatoes</Text>
-                      <Text style={[styles.ratingBubbleValue, styles.lightText]}>{Math.round(rtRating)}%</Text>
-                    </View>
-                  ) : null}
-                  
-                  {/* Friend Score - Blue background, white text */}
-                  <View style={[styles.ratingBubble, styles.friendBubble]}>
-                    <Text style={[styles.ratingBubbleLabel, styles.lightText]}>Friend Score</Text>
-                    <Text style={[styles.ratingBubbleValue, styles.lightText]}>{friendScore}%</Text>
+
+                    {/* Butter Score - Light yellow background, black text */}
+                    {movie.butterScore !== undefined && (
+                      <View style={[styles.ratingBubble, styles.butterBubble]}>
+                        <Text style={[styles.ratingBubbleLabel, styles.darkText]}>Butter Score</Text>
+                        <Text style={[styles.ratingBubbleValue, styles.darkText]}>{movie.butterScore}%</Text>
+                      </View>
+                    )}
                   </View>
-                  
-                  {/* Butter Score - Light yellow background, black text */}
-                  {movie.butterScore !== undefined && (
-                    <View style={[styles.ratingBubble, styles.butterBubble]}>
-                      <Text style={[styles.ratingBubbleLabel, styles.darkText]}>Butter Score</Text>
-                      <Text style={[styles.ratingBubbleValue, styles.darkText]}>{movie.butterScore}%</Text>
-                    </View>
-                  )}
-                </View>
+                )}
               </View>
 
               {/* Movie Title */}
               <Text style={styles.movieTitle}>{movie.title}</Text>
 
               {/* Year and Genres */}
-              <Text style={styles.yearGenresText}>
-                ({movie.year}) • {movie.genres.slice(0, 3).join(' • ')}
-              </Text>
+              {(ticketLayout.showYear || ticketLayout.showGenre) && (
+                <Text style={styles.yearGenresText}>
+                  {ticketLayout.showYear && `(${movie.year})`}
+                  {ticketLayout.showYear && ticketLayout.showGenre && ' • '}
+                  {ticketLayout.showGenre && movie.genres.slice(0, 3).join(' • ')}
+                </Text>
+              )}
 
-              {/* Perforation Line - above description */}
-              <View style={styles.perforationRow} pointerEvents="none">
-                {Array.from({ length: 40 }, (_, i) => (
-                  <View key={i} style={styles.perforationDot} />
-                ))}
-              </View>
+              {/* TODO: Director - Add director field to movie data */}
+              {ticketLayout.showDirector && (
+                <Text style={styles.directorText}>
+                  {/* Placeholder - Director data not yet available in movie type */}
+                  Director: TBD (data not available)
+                </Text>
+              )}
+
+              {/* TODO: Cast - Add cast field to movie data */}
+              {ticketLayout.showCast && (
+                <Text style={styles.castText}>
+                  {/* Placeholder - Cast data not yet available in movie type */}
+                  Cast: TBD (data not available)
+                </Text>
+              )}
+
+              {/* Perforation Line - above description (only show if plot is visible) */}
+              {ticketLayout.showPlot && (
+                <View style={styles.perforationRow} pointerEvents="none">
+                  {Array.from({ length: 40 }, (_, i) => (
+                    <View key={i} style={styles.perforationDot} />
+                  ))}
+                </View>
+              )}
 
               {/* Description Section */}
-              <View style={styles.descriptionSection}>
-                <Text style={styles.descriptionLabel}>DESCRIPTION</Text>
-                <Text style={styles.descriptionText}>
-                  {movie.description}
-                </Text>
-              </View>
+              {ticketLayout.showPlot && (
+                <View style={styles.descriptionSection}>
+                  <Text style={styles.descriptionLabel}>DESCRIPTION</Text>
+                  <Text style={styles.descriptionText}>
+                    {movie.description}
+                  </Text>
+                </View>
+              )}
             </ScrollView>
 
             {/* Bottom Section: ADMIT ONE badge and Serial Number */}
@@ -232,6 +262,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#E8D5C4',
   },
+  posterFullWidth: {
+    flex: 0,
+    width: '100%',
+  },
   poster: {
     width: '100%',
     height: '100%',
@@ -300,6 +334,18 @@ const styles = StyleSheet.create({
     color: '#6B4330',
     marginBottom: 20,
     lineHeight: 20,
+  },
+  directorText: {
+    fontSize: 13,
+    color: '#7E1616',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  castText: {
+    fontSize: 13,
+    color: '#6B4330',
+    marginBottom: 16,
+    lineHeight: 18,
   },
   perforationRow: {
     flexDirection: 'row',

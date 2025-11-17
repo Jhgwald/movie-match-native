@@ -1,24 +1,29 @@
-import { useState, useEffect } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { useState, useEffect, useMemo } from 'react';
+import { View, StyleSheet, Dimensions, Text, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import SwipeDeck from '../../src/components/SwipeDeck';
 import DetailsModal from '../../src/components/DetailsModal';
+import FeedSettingsModal from '../../src/components/FeedSettingsModal';
 import { movies as sampleMovies } from '../../src/data/sample/movies';
 import { getTrendingMovies } from '../../src/services/tmdb';
 import { HAS_TMDB } from '../../src/config/env';
 import { markSeen, markPassed, markWatchlist } from '../../src/state/library';
 import type { Movie, MovieBase } from '../../src/types/movie';
 import { useProfileTabAnimation } from '../../src/context/ProfileTabAnimationContext';
+import { FeedPreferencesProvider, useFeedPreferences } from '../../src/context/FeedPreferencesContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function FeedScreen() {
+function FeedContent() {
   const insets = useSafeAreaInsets();
   const [movies, setMovies] = useState<readonly (MovieBase | Movie)[]>(sampleMovies);
   const [detailsVisible, setDetailsVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<MovieBase | Movie | null>(null);
   const { triggerProfileShake, iconPositions } = useProfileTabAnimation();
+  const { feedPreferences } = useFeedPreferences();
 
   useEffect(() => {
     // Load movies in background, don't block UI
@@ -78,17 +83,65 @@ export default function FeedScreen() {
     setDetailsVisible(true);
   };
 
+  // Filter movies based on streaming preferences
+  // TODO: When TMDB provider data is available, ensure it maps to our service names
+  const filteredMovies = useMemo(() => {
+    const { streaming } = feedPreferences;
+
+    // If filtering is disabled, show all movies
+    if (!streaming.onlyShowMyServices) {
+      return movies;
+    }
+
+    // Get selected services
+    const selectedServices = Object.entries(streaming.services)
+      .filter(([_, enabled]) => enabled)
+      .map(([service]) => service);
+
+    // If no services selected, show all movies (fallback)
+    if (selectedServices.length === 0) {
+      return movies;
+    }
+
+    // Filter movies that have at least one overlapping service
+    return movies.filter((movie) => {
+      if (!movie.streamingPlatforms || movie.streamingPlatforms.length === 0) {
+        // If movie has no streaming data, include it (avoid hiding content)
+        return true;
+      }
+
+      // Check if movie is available on any selected service
+      return movie.streamingPlatforms.some((platform) =>
+        selectedServices.includes(platform)
+      );
+    });
+  }, [movies, feedPreferences]);
+
+  const HEADER_HEIGHT = 56;
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
-      <View style={[styles.deckContainer, { 
-        paddingTop: insets.top + 8, 
+
+      {/* Custom Header */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <Text style={styles.headerTitle}>Feed</Text>
+        <TouchableOpacity
+          onPress={() => setSettingsVisible(true)}
+          style={styles.settingsButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="options" size={24} color="#FFFEAD" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.deckContainer, {
+        paddingTop: 8,
         paddingBottom: 0,
-        height: SCREEN_HEIGHT - insets.top,
+        height: SCREEN_HEIGHT - insets.top - HEADER_HEIGHT,
       }]}>
         <SwipeDeck
-          movies={movies}
+          movies={filteredMovies}
           onSwipeRight={handleSwipeRight}
           onSwipeLeft={handleSwipeLeft}
           onSwipeUp={handleSwipeUp}
@@ -96,7 +149,7 @@ export default function FeedScreen() {
           onDetails={handleDetails}
           onProfileShake={triggerProfileShake}
           profileIconPosition={iconPositions.profile}
-          maxTicketHeight={SCREEN_HEIGHT - insets.top - insets.bottom - 49 - 8 - 8}
+          maxTicketHeight={SCREEN_HEIGHT - insets.top - HEADER_HEIGHT - insets.bottom - 49 - 8 - 8}
         />
       </View>
 
@@ -111,7 +164,21 @@ export default function FeedScreen() {
           }}
         />
       )}
+
+      <FeedSettingsModal
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+      />
     </View>
+  );
+}
+
+// Wrapper component with FeedPreferencesProvider
+export default function FeedScreen() {
+  return (
+    <FeedPreferencesProvider>
+      <FeedContent />
+    </FeedPreferencesProvider>
   );
 }
 
@@ -119,6 +186,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#6B0000', // Deep red like movie theater carpet and seats
+  },
+  header: {
+    backgroundColor: '#7E1616',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#DC2026',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFEAD',
+    letterSpacing: 0.5,
+  },
+  settingsButton: {
+    padding: 8,
   },
   deckContainer: {
     flex: 1,
