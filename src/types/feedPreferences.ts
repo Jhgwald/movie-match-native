@@ -1,11 +1,4 @@
-export type TicketLayoutPreferences = {
-  showScores: boolean;
-  showDirector: boolean;
-  showCast: boolean;
-  showGenre: boolean;
-  showYear: boolean;
-  showPlot: boolean;
-};
+export type CardLayoutPreset = 'minimal' | 'standard' | 'detailed';
 
 export type StreamingService =
   | 'Netflix'
@@ -23,20 +16,13 @@ export type StreamingPreferences = {
 };
 
 export type FeedPreferences = {
-  ticketLayout: TicketLayoutPreferences;
+  cardLayoutPreset: CardLayoutPreset;
   streaming: StreamingPreferences;
 };
 
-// Default preferences - show everything by default
+// Default preferences - Standard preset
 export const DEFAULT_FEED_PREFERENCES: FeedPreferences = {
-  ticketLayout: {
-    showScores: true,
-    showDirector: true,
-    showCast: true,
-    showGenre: true,
-    showYear: true,
-    showPlot: true,
-  },
+  cardLayoutPreset: 'standard',
   streaming: {
     onlyShowMyServices: false,
     services: {

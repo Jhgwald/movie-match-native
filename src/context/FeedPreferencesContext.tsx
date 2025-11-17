@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   type FeedPreferences,
-  type TicketLayoutPreferences,
   type StreamingPreferences,
   DEFAULT_FEED_PREFERENCES,
 } from '../types/feedPreferences';
@@ -12,7 +11,6 @@ const STORAGE_KEY = '@movie_match:feed_preferences';
 interface FeedPreferencesContextValue {
   feedPreferences: FeedPreferences;
   setFeedPreferences: (preferences: FeedPreferences) => void;
-  setTicketLayoutPreferences: (layout: TicketLayoutPreferences) => void;
   setStreamingPreferences: (streaming: StreamingPreferences) => void;
   isLoading: boolean;
 }
@@ -56,14 +54,6 @@ export function FeedPreferencesProvider({ children }: { children: ReactNode }) {
     savePreferences(preferences);
   };
 
-  const setTicketLayoutPreferences = (layout: TicketLayoutPreferences) => {
-    const newPreferences = {
-      ...feedPreferences,
-      ticketLayout: layout,
-    };
-    setFeedPreferences(newPreferences);
-  };
-
   const setStreamingPreferences = (streaming: StreamingPreferences) => {
     const newPreferences = {
       ...feedPreferences,
@@ -77,7 +67,6 @@ export function FeedPreferencesProvider({ children }: { children: ReactNode }) {
       value={{
         feedPreferences,
         setFeedPreferences,
-        setTicketLayoutPreferences,
         setStreamingPreferences,
         isLoading,
       }}

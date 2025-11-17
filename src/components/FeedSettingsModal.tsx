@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFeedPreferences } from '../context/FeedPreferencesContext';
-import type { StreamingService } from '../types/feedPreferences';
+import type { StreamingService, CardLayoutPreset } from '../types/feedPreferences';
 
 interface FeedSettingsModalProps {
   visible: boolean;
@@ -33,20 +33,20 @@ export default function FeedSettingsModal({ visible, onClose }: FeedSettingsModa
   const { feedPreferences, setFeedPreferences } = useFeedPreferences();
 
   // Local state for editing (only save on Apply)
-  const [ticketLayout, setTicketLayout] = useState(feedPreferences.ticketLayout);
+  const [cardLayoutPreset, setCardLayoutPreset] = useState<CardLayoutPreset>(feedPreferences.cardLayoutPreset);
   const [streaming, setStreaming] = useState(feedPreferences.streaming);
 
   // Update local state when preferences change or modal opens
   useEffect(() => {
     if (visible) {
-      setTicketLayout(feedPreferences.ticketLayout);
+      setCardLayoutPreset(feedPreferences.cardLayoutPreset);
       setStreaming(feedPreferences.streaming);
     }
   }, [visible, feedPreferences]);
 
   const handleApply = () => {
     setFeedPreferences({
-      ticketLayout,
+      cardLayoutPreset,
       streaming,
     });
     onClose();
@@ -54,7 +54,7 @@ export default function FeedSettingsModal({ visible, onClose }: FeedSettingsModa
 
   const handleCancel = () => {
     // Reset to saved preferences
-    setTicketLayout(feedPreferences.ticketLayout);
+    setCardLayoutPreset(feedPreferences.cardLayoutPreset);
     setStreaming(feedPreferences.streaming);
     onClose();
   };
@@ -80,67 +80,34 @@ export default function FeedSettingsModal({ visible, onClose }: FeedSettingsModa
           </View>
 
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-            {/* Ticket Layout Section */}
+            {/* Card Style Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Ticket Layout</Text>
+              <Text style={styles.sectionTitle}>Card Style</Text>
               <Text style={styles.sectionDescription}>
-                Choose what appears on your movie ticket.
+                Choose how much information appears on each movie card.
               </Text>
 
               <View style={styles.settingsGroup}>
-                <SettingRow
-                  icon="trophy"
-                  label="Scores"
-                  description="Show IMDb, Rotten Tomatoes, and Friend Score"
-                  value={ticketLayout.showScores}
-                  onValueChange={(value) =>
-                    setTicketLayout({ ...ticketLayout, showScores: value })
-                  }
+                <PresetOption
+                  preset="minimal"
+                  label="Minimal"
+                  description="Poster, title, year, genres, short description, and scores."
+                  selected={cardLayoutPreset === 'minimal'}
+                  onSelect={() => setCardLayoutPreset('minimal')}
                 />
-                <SettingRow
-                  icon="film"
-                  label="Director"
-                  description="Show the film director"
-                  value={ticketLayout.showDirector}
-                  onValueChange={(value) =>
-                    setTicketLayout({ ...ticketLayout, showDirector: value })
-                  }
+                <PresetOption
+                  preset="standard"
+                  label="Standard"
+                  description="Adds runtime and director."
+                  selected={cardLayoutPreset === 'standard'}
+                  onSelect={() => setCardLayoutPreset('standard')}
                 />
-                <SettingRow
-                  icon="people"
-                  label="Cast"
-                  description="Show lead actors"
-                  value={ticketLayout.showCast}
-                  onValueChange={(value) =>
-                    setTicketLayout({ ...ticketLayout, showCast: value })
-                  }
-                />
-                <SettingRow
-                  icon="pricetags"
-                  label="Genre"
-                  description="Show movie genres"
-                  value={ticketLayout.showGenre}
-                  onValueChange={(value) =>
-                    setTicketLayout({ ...ticketLayout, showGenre: value })
-                  }
-                />
-                <SettingRow
-                  icon="calendar"
-                  label="Year"
-                  description="Show release year"
-                  value={ticketLayout.showYear}
-                  onValueChange={(value) =>
-                    setTicketLayout({ ...ticketLayout, showYear: value })
-                  }
-                />
-                <SettingRow
-                  icon="document-text"
-                  label="Plot / Synopsis"
-                  description="Show movie description"
-                  value={ticketLayout.showPlot}
-                  onValueChange={(value) =>
-                    setTicketLayout({ ...ticketLayout, showPlot: value })
-                  }
+                <PresetOption
+                  preset="detailed"
+                  label="Detailed"
+                  description="Adds cast and language for a full breakdown."
+                  selected={cardLayoutPreset === 'detailed'}
+                  onSelect={() => setCardLayoutPreset('detailed')}
                 />
               </View>
             </View>
@@ -200,7 +167,7 @@ function SettingRow({
   onValueChange,
   highlighted = false,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap;
   label: string;
   description?: string;
   value: boolean;
@@ -210,7 +177,9 @@ function SettingRow({
   return (
     <View style={[styles.settingRow, highlighted && styles.highlightedRow]}>
       <View style={styles.settingLeft}>
-        <Ionicons name={icon} size={20} color="#7E1616" style={styles.settingIcon} />
+        {icon && (
+          <Ionicons name={icon} size={20} color="#7E1616" style={styles.settingIcon} />
+        )}
         <View style={styles.settingTextContainer}>
           <Text style={styles.settingLabel}>{label}</Text>
           {description && <Text style={styles.settingDescription}>{description}</Text>}
@@ -223,6 +192,39 @@ function SettingRow({
         thumbColor="#FFFFFF"
       />
     </View>
+  );
+}
+
+function PresetOption({
+  preset,
+  label,
+  description,
+  selected,
+  onSelect,
+}: {
+  preset: CardLayoutPreset;
+  label: string;
+  description: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.presetOption, selected && styles.presetOptionSelected]}
+      onPress={onSelect}
+    >
+      <View style={styles.presetLeft}>
+        <View style={[styles.radioButton, selected && styles.radioButtonSelected]}>
+          {selected && <View style={styles.radioButtonInner} />}
+        </View>
+        <View style={styles.presetTextContainer}>
+          <Text style={[styles.presetLabel, selected && styles.presetLabelSelected]}>
+            {label}
+          </Text>
+          <Text style={styles.presetDescription}>{description}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -355,6 +357,60 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8D6A3A',
     lineHeight: 16,
+  },
+  presetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3E9DC',
+  },
+  presetOptionSelected: {
+    backgroundColor: '#FFF9F0',
+  },
+  presetLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  radioButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E0C296',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  radioButtonSelected: {
+    borderColor: '#7E1616',
+  },
+  radioButtonInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#7E1616',
+  },
+  presetTextContainer: {
+    flex: 1,
+  },
+  presetLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3a2b1a',
+    marginBottom: 4,
+  },
+  presetLabelSelected: {
+    color: '#7E1616',
+    fontWeight: '700',
+  },
+  presetDescription: {
+    fontSize: 13,
+    color: '#6B4330',
+    lineHeight: 18,
   },
   servicesContainer: {
     paddingTop: 8,

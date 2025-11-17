@@ -10,6 +10,10 @@ export interface MovieBase {
   imdbId?: string;
   streamingPlatforms?: string[]; // e.g., ['Netflix', 'Disney+', 'HBO Max']
   butterScore?: number; // 0-100, algorithm's prediction of how much user will like it
+  runtimeMinutes?: number;
+  director?: string;
+  cast?: string[];
+  language?: string;
 }
 
 export interface MovieRatings {
