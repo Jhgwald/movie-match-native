@@ -413,6 +413,7 @@ export default function SwipeDeck({
       case 'down':
         // Swipe down to show details - card moves down and then resets
         y = SCREEN_HEIGHT * 0.3; // Move down a bit to show action
+        console.log('[SwipeDeck] swipe down on movie:', movie.id, movie.title, 'from index:', currentIndex);
         onSwipeDown?.(movie);
         shouldAdvance = false;
         // Animate down then reset
@@ -686,7 +687,10 @@ export default function SwipeDeck({
             >
               <MovieCard 
                 movie={movie}
-                onDetails={() => onDetails?.(movie)}
+                onDetails={() => {
+                  console.log('[SwipeDeck] onDetails called for movie:', movie.id, movie.title, 'from index:', index);
+                  onDetails?.(movie);
+                }}
                 borderColor={cardBorderColor}
                 maxHeight={maxTicketHeight}
               />

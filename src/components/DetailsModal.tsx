@@ -26,38 +26,33 @@ interface DetailsModalProps {
 }
 
 export default function DetailsModal({ visible, movie, onClose }: DetailsModalProps) {
-  const [enrichedMovie, setEnrichedMovie] = useState<MovieBase | Movie>(movie);
+  // Only store enriched data (director, cast, ratings) in state
+  // Always use the movie prop directly for basic fields (title, year, poster, description, etc.)
   const [loading, setLoading] = useState(false);
   const [director, setDirector] = useState<string | null>(null);
   const [cast, setCast] = useState<string[]>([]);
   const [ratings, setRatings] = useState<MovieRatings>({});
-  const [currentMovieId, setCurrentMovieId] = useState<string>(movie.id);
 
-  // Reset state when movie.id changes
+  // Reset enriched data whenever movie.id changes
   useEffect(() => {
     if (!movie) return;
     
-    // Only reset if movie actually changed
-    if (movie.id !== currentMovieId) {
-      setCurrentMovieId(movie.id);
-      
-      // Reset all state immediately when movie changes
-      setEnrichedMovie(movie);
-      setRatings('ratings' in movie ? movie.ratings || {} : {});
-      setDirector(null);
-      setCast([]);
-      setLoading(false);
-    }
-  }, [movie.id]); // Only depend on movie.id to detect changes
+    console.log('[DetailsModal] movie prop changed to:', movie.id, movie.title);
+    
+    // Reset all enriched data immediately when movie changes
+    setRatings('ratings' in movie ? movie.ratings || {} : {});
+    setDirector(null);
+    setCast([]);
+    setLoading(false);
+  }, [movie.id]); // Reset whenever the movie ID changes
   
-  // Fetch additional details when modal becomes visible
+  // Fetch additional details when modal becomes visible or movie changes
   useEffect(() => {
     if (!visible || !movie || !HAS_TMDB) return;
     
     const tmdbId = typeof movie.id === 'string' ? parseInt(movie.id) : movie.id;
     if (isNaN(tmdbId) || tmdbId <= 0) {
       // If we can't fetch from TMDb, just use the movie data we have
-      setEnrichedMovie(movie);
       setLoading(false);
       return;
     }
@@ -69,8 +64,6 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
       .then((details) => {
         // Verify this is still the current movie (prevent race conditions)
         if (fetchId === movie.id) {
-          const updated = toMovie(movie, details);
-          setEnrichedMovie(updated);
           setDirector(details.directorName);
           setCast(details.castTop5);
           
@@ -94,13 +87,13 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
           setLoading(false);
         }
       });
-  }, [visible, movie.id]); // Fetch when modal opens or movie changes
+  }, [visible, movie.id]); // Fetch when modal opens or movie ID changes
 
   const handleTrailer = async () => {
-    if (enrichedMovie.trailer) {
-      const canOpen = await Linking.canOpenURL(enrichedMovie.trailer);
+    if (movie.trailer) {
+      const canOpen = await Linking.canOpenURL(movie.trailer);
       if (canOpen) {
-        await Linking.openURL(enrichedMovie.trailer);
+        await Linking.openURL(movie.trailer);
       }
     }
   };
@@ -126,9 +119,10 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
             </View>
           )}
           
-          {enrichedMovie.poster && (
+          {/* Always use movie prop directly for basic fields */}
+          {movie.poster && (
             <Image
-              source={{ uri: enrichedMovie.poster }}
+              source={{ uri: movie.poster }}
               style={styles.poster}
               resizeMode="cover"
             />
@@ -136,11 +130,11 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
           
           <View style={styles.content}>
             <Text style={styles.title}>
-              {enrichedMovie.title} ({enrichedMovie.year})
+              {movie.title} ({movie.year})
             </Text>
             
             <View style={styles.genreContainer}>
-              {enrichedMovie.genres.map((genre, index) => (
+              {movie.genres.map((genre, index) => (
                 <View key={index} style={styles.genreTag}>
                   <Text style={styles.genreText}>{genre}</Text>
                 </View>
@@ -181,17 +175,17 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
                 )}
                 <View style={styles.ratingBadge}>
                   <Text style={styles.ratingLabel}>TMDb</Text>
-                  <Text style={styles.ratingValue}>{enrichedMovie.tmdbRating.toFixed(1)}</Text>
+                  <Text style={styles.ratingValue}>{movie.tmdbRating.toFixed(1)}</Text>
                 </View>
               </View>
             </View>
             
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.description}>{enrichedMovie.description}</Text>
+              <Text style={styles.description}>{movie.description}</Text>
             </View>
             
-            {enrichedMovie.trailer && (
+            {movie.trailer && (
               <TouchableOpacity style={styles.trailerButton} onPress={handleTrailer}>
                 <Ionicons name="play-circle" size={24} color="#fff" />
                 <Text style={styles.trailerButtonText}>Watch Trailer</Text>

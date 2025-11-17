@@ -74,11 +74,13 @@ function FeedContent() {
 
   const handleSwipeDown = (movie: MovieBase | Movie) => {
     // Down = Details (don't advance card, just show modal)
+    console.log('[Details] opening modal for movie:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };
 
   const handleDetails = (movie: MovieBase | Movie) => {
+    console.log('[Details] opening modal for movie:', movie.id, movie.title);
     setSelectedMovie(movie);
     setDetailsVisible(true);
   };
