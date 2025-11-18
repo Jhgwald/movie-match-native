@@ -11,6 +11,7 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
+// import { WebView } from 'react-native-webview'; // TODO: Re-enable when implementing in-app video playback
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -18,6 +19,7 @@ import type { Movie, MovieBase, MovieRatings } from '../types/movie';
 import { getDetailsWithCredits, toMovie } from '../services/tmdb';
 import { getOmdbRatingsByImdbId } from '../services/omdb';
 import { HAS_TMDB, HAS_OMDB } from '../config/env';
+import { useBlindMode } from '../context/BlindModeContext';
 
 interface DetailsModalProps {
   visible: boolean;
@@ -26,12 +28,14 @@ interface DetailsModalProps {
 }
 
 export default function DetailsModal({ visible, movie, onClose }: DetailsModalProps) {
+  const { blindModeSettings } = useBlindMode();
   // Only store enriched data (director, cast, ratings) in state
   // Always use the movie prop directly for basic fields (title, year, poster, description, etc.)
   const [loading, setLoading] = useState(false);
   const [director, setDirector] = useState<string | null>(null);
   const [cast, setCast] = useState<string[]>([]);
   const [ratings, setRatings] = useState<MovieRatings>({});
+  // const [showTrailer, setShowTrailer] = useState(false); // TODO: Re-enable when implementing in-app video playback
 
   // Reset enriched data whenever movie.id changes
   useEffect(() => {
@@ -43,6 +47,7 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
     setRatings('ratings' in movie ? movie.ratings || {} : {});
     setDirector(null);
     setCast([]);
+    // setShowTrailer(false); // TODO: Re-enable when implementing in-app video playback
     setLoading(false);
   }, [movie.id]); // Reset whenever the movie ID changes
   
@@ -92,12 +97,37 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
 
   const handleTrailer = async () => {
     if (movie.trailer) {
+      // Open trailer in external app (YouTube app) or browser
+      // TODO: Later, implement true in-app video playback using expo-av or react-native-video
+      // For now, opening externally avoids YouTube Error 153 (embed configuration issues)
       const canOpen = await Linking.canOpenURL(movie.trailer);
       if (canOpen) {
         await Linking.openURL(movie.trailer);
+      } else {
+        console.warn('[DetailsModal] Cannot open trailer URL:', movie.trailer);
       }
     }
   };
+
+  // TODO: Re-implement embedded player once we handle YouTube's requirements properly
+  // This function can be used later for converting YouTube URLs to embed format
+  // when we implement proper in-app video playback (e.g., using expo-av or react-native-video)
+  // const getTrailerEmbedUrl = (url: string): string => {
+  //   // Handle YouTube URLs
+  //   if (url.includes('youtube.com/watch?v=')) {
+  //     const videoId = url.split('v=')[1]?.split('&')[0];
+  //     if (videoId) {
+  //       return `https://www.youtube.com/embed/${videoId}`;
+  //     }
+  //   }
+  //   if (url.includes('youtu.be/')) {
+  //     const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+  //     if (videoId) {
+  //       return `https://www.youtube.com/embed/${videoId}`;
+  //     }
+  //   }
+  //   return url;
+  // };
 
   return (
     <Modal
@@ -130,67 +160,170 @@ export default function DetailsModal({ visible, movie, onClose }: DetailsModalPr
           )}
           
           <View style={styles.content}>
+            {/* Core Movie Info */}
             <Text style={styles.title}>
               {movie.title} ({movie.year})
             </Text>
             
             <View style={styles.genreContainer}>
-              {movie.genres.map((genre, index) => (
-                <View key={index} style={styles.genreTag}>
-                  <Text style={styles.genreText}>{genre}</Text>
-                </View>
-              ))}
+              {movie.genres && movie.genres.length > 0 ? (
+                movie.genres.map((genre, index) => (
+                  <View key={index} style={styles.genreTag}>
+                    <Text style={styles.genreText}>{genre}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.placeholderText}>—</Text>
+              )}
             </View>
             
-            {(director || cast.length > 0) && (
-              <View style={styles.section}>
-                {director && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.label}>Director:</Text>
-                    <Text style={styles.value}>{director}</Text>
-                  </View>
-                )}
-                {cast.length > 0 && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.label}>Cast:</Text>
-                    <Text style={styles.value}>{cast.join(', ')}</Text>
-                  </View>
-                )}
+            {/* Details Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Details</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Runtime:</Text>
+                <Text style={styles.value}>
+                  {movie.runtimeMinutes ? `${movie.runtimeMinutes} min` : '—'}
+                </Text>
               </View>
-            )}
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>MPAA Rating:</Text>
+                <Text style={styles.value}>
+                  {movie.mpaaRating || '—'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Language:</Text>
+                <Text style={styles.value}>
+                  {movie.language || '—'}
+                </Text>
+              </View>
+            </View>
             
+            {/* Creators Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Creators</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Director:</Text>
+                <Text style={styles.value}>
+                  {director || movie.director || '(Coming soon)'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Cast:</Text>
+                <Text style={styles.value}>
+                  {cast.length > 0 
+                    ? cast.join(', ') 
+                    : (movie.cast && movie.cast.length > 0 
+                        ? movie.cast.slice(0, 5).join(', ') 
+                        : '(Coming soon)')}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Writers:</Text>
+                <Text style={styles.value}>(Coming soon)</Text>
+              </View>
+            </View>
+            
+            {/* Ratings Section */}
             <View style={styles.ratingsSection}>
               <Text style={styles.sectionTitle}>Ratings</Text>
               <View style={styles.ratingsRow}>
-                {ratings.imdb !== undefined && (
-                  <View style={styles.ratingBadge}>
-                    <Text style={styles.ratingLabel}>IMDb</Text>
-                    <Text style={styles.ratingValue}>{ratings.imdb.toFixed(1)}</Text>
-                  </View>
-                )}
-                {ratings.rtCritics !== undefined && (
-                  <View style={styles.ratingBadge}>
-                    <Text style={styles.ratingLabel}>RT Critics</Text>
-                    <Text style={styles.ratingValue}>{Math.round(ratings.rtCritics)}%</Text>
-                  </View>
-                )}
+                <View style={styles.ratingBadge}>
+                  <Text style={styles.ratingLabel}>IMDb</Text>
+                  <Text style={styles.ratingValue}>
+                    {blindModeSettings.hideImdb
+                      ? '🍿'
+                      : ratings.imdb !== undefined
+                      ? ratings.imdb.toFixed(1)
+                      : 'N/A'}
+                  </Text>
+                </View>
+                <View style={styles.ratingBadge}>
+                  <Text style={styles.ratingLabel}>RT Critics</Text>
+                  <Text style={styles.ratingValue}>
+                    {blindModeSettings.hideRtCritics
+                      ? '🍿'
+                      : ratings.rtCritics !== undefined
+                      ? `${Math.round(ratings.rtCritics)}%`
+                      : 'N/A'}
+                  </Text>
+                </View>
+                <View style={styles.ratingBadge}>
+                  <Text style={styles.ratingLabel}>RT Audience</Text>
+                  <Text style={styles.ratingValue}>
+                    {blindModeSettings.hideRtAudience
+                      ? '🍿'
+                      : ratings.rtAudience !== undefined
+                      ? `${Math.round(ratings.rtAudience)}%`
+                      : 'N/A'}
+                  </Text>
+                </View>
                 <View style={styles.ratingBadge}>
                   <Text style={styles.ratingLabel}>TMDb</Text>
-                  <Text style={styles.ratingValue}>{movie.tmdbRating.toFixed(1)}</Text>
+                  <Text style={styles.ratingValue}>
+                    {blindModeSettings.hideTmdb
+                      ? '🍿'
+                      : movie.tmdbRating
+                      ? movie.tmdbRating.toFixed(1)
+                      : 'N/A'}
+                  </Text>
                 </View>
               </View>
             </View>
             
+            {/* Overview Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.description}>{movie.description}</Text>
+              <Text style={styles.sectionTitle}>Overview</Text>
+              <Text style={styles.description}>
+                {movie.description || 'No description available.'}
+              </Text>
             </View>
             
-            {movie.trailer && (
-              <TouchableOpacity style={styles.trailerButton} onPress={handleTrailer}>
-                <Ionicons name="play-circle" size={24} color="#fff" />
-                <Text style={styles.trailerButtonText}>Watch Trailer</Text>
-              </TouchableOpacity>
+            {/* Where to Watch Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Where to Watch</Text>
+              {movie.streamingPlatforms && movie.streamingPlatforms.length > 0 ? (
+                <View style={styles.streamingContainer}>
+                  {movie.streamingPlatforms.map((platform, index) => (
+                    <View key={index} style={styles.streamingChip}>
+                      <Text style={styles.streamingChipText}>{platform}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.placeholderText}>Streaming availability coming soon</Text>
+              )}
+            </View>
+            
+            {/* Trailer Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Trailer</Text>
+              {movie.trailer ? (
+                <TouchableOpacity style={styles.trailerButton} onPress={handleTrailer}>
+                  <Ionicons name="play-circle" size={24} color="#fff" />
+                  <Text style={styles.trailerButtonText}>Watch Trailer</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.trailerPlaceholder}>
+                  <Text style={styles.placeholderText}>Trailer not available</Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Friends Section (Placeholder) - Hidden if friends rating is hidden */}
+            {!blindModeSettings.hideFriendsRating && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Friends</Text>
+                <View style={styles.infoRow}>
+                  <Text style={styles.label}>Friends who've seen this:</Text>
+                  <Text style={styles.value}>(Friends data coming soon)</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.label}>Average friend rating:</Text>
+                  <Text style={styles.value}>🍿</Text>
+                </View>
+              </View>
             )}
           </View>
         </ScrollView>
@@ -303,6 +436,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#DC2026', // Movie theater red
   },
+  blindModeBadge: {
+    // Popcorn overlay style - keeps badge visible but hides score value
+  },
   description: {
     fontSize: 16,
     color: '#d1d1d6',
@@ -323,5 +459,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  trailerPlaceholder: {
+    padding: 16,
+    backgroundColor: '#1c1c1e',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: '#8e8e93',
+    fontStyle: 'italic',
+  },
+  streamingContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  streamingChip: {
+    backgroundColor: '#1c1c1e',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2c2c2e',
+  },
+  streamingChipText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '500',
+  },
+  // TODO: Re-enable these styles when implementing in-app video playback
+  // trailerPlayerContainer: {
+  //   marginTop: 8,
+  //   backgroundColor: '#000',
+  //   borderRadius: 8,
+  //   overflow: 'hidden',
+  // },
+  // trailerPlayerHeader: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'center',
+  //   padding: 12,
+  //   backgroundColor: '#1c1c1e',
+  // },
+  // trailerPlayerTitle: {
+  //   fontSize: 16,
+  //   fontWeight: '600',
+  //   color: '#fff',
+  // },
+  // trailerCloseButton: {
+  //   padding: 4,
+  // },
+  // trailerWebView: {
+  //   width: '100%',
+  //   height: 220,
+  //   backgroundColor: '#000',
+  // },
 });
+
 

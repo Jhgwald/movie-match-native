@@ -18,7 +18,7 @@ import {
 } from '../../src/state/library';
 import type { Movie, MovieBase } from '../../src/types/movie';
 import { useProfileTabAnimation } from '../../src/context/ProfileTabAnimationContext';
-import { FeedPreferencesProvider, useFeedPreferences } from '../../src/context/FeedPreferencesContext';
+import { useFeedPreferences } from '../../src/context/FeedPreferencesContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -189,13 +189,8 @@ function FeedContent() {
   );
 }
 
-// Wrapper component with FeedPreferencesProvider
 export default function FeedScreen() {
-  return (
-    <FeedPreferencesProvider>
-      <FeedContent />
-    </FeedPreferencesProvider>
-  );
+  return <FeedContent />;
 }
 
 const styles = StyleSheet.create({

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Stack, useFocusEffect } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import MovieListItem from '../../src/components/MovieListItem';
@@ -10,6 +10,7 @@ import { getMoviesByIds } from '../../src/lib/movieHelpers';
 import type { Movie, MovieBase } from '../../src/types/movie';
 
 export default function WatchlistScreen() {
+  const router = useRouter();
   const [movies, setMovies] = useState<(Movie | MovieBase)[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | MovieBase | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
@@ -48,6 +49,15 @@ export default function WatchlistScreen() {
           title: 'Your Watchlist',
           headerStyle: { backgroundColor: '#7E1616' },
           headerTintColor: '#FFFEAD',
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={24} color="#FFFEAD" />
+            </TouchableOpacity>
+          ),
         }}
       />
 
@@ -151,5 +161,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8e8e93',
     textAlign: 'center',
+  },
+  backButton: {
+    marginLeft: 16,
+    padding: 4,
   },
 });

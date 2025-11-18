@@ -10,23 +10,26 @@ import type { Movie, MovieBase } from '../../src/types/movie';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /**
- * Insertion-based ranking: Insert movies from "To Be Ranked" into existing ranked list
+ * Binary search insertion ranking: Insert movies from "To Be Ranked" into existing ranked list
  * 
- * Algorithm:
+ * Algorithm (Binary Search):
  * - Take one candidate movie from "To Be Ranked"
- * - Compare it against ranked movies one-by-one (top to bottom)
- * - If user prefers candidate: insert above current ranked movie
- * - If user prefers ranked: move to next ranked movie
- * - If "Can't decide" for all: skip this movie (keep in To Be Ranked)
+ * - Always compare against the middle movie of the current search range
+ * - If user prefers candidate: search in the upper half (above middle)
+ * - If user prefers ranked: search in the lower half (below middle)
+ * - Repeat until exact insertion point is found
+ * - If "Can't decide": place next to current comparison or skip
  */
 function useInsertionRanking(
   candidateMovies: (Movie | MovieBase)[],
   existingRankedMovies: (Movie | MovieBase)[]
 ) {
   const [candidateIndex, setCandidateIndex] = useState(0);
-  const [rankedIndex, setRankedIndex] = useState(0);
+  // Binary search range: [searchStart, searchEnd)
+  // searchStart is inclusive, searchEnd is exclusive
+  const [searchStart, setSearchStart] = useState(0);
+  const [searchEnd, setSearchEnd] = useState(0);
   // Initialize with existing ranked movies, or empty array if none exist
-  // Note: This initial state is set once, but the useEffect will update it when movies change
   const [insertedRankedMovies, setInsertedRankedMovies] = useState<(Movie | MovieBase)[]>([]);
   const [skippedMovies, setSkippedMovies] = useState<(Movie | MovieBase)[]>([]);
   const [isComplete, setIsComplete] = useState(false);
@@ -34,55 +37,98 @@ function useInsertionRanking(
   const currentCandidate = candidateIndex < candidateMovies.length 
     ? candidateMovies[candidateIndex] 
     : null;
-  const currentRanked = rankedIndex < insertedRankedMovies.length 
-    ? insertedRankedMovies[rankedIndex] 
-    : null;
+
+  // Calculate the middle index of the current search range
+  const getMiddleIndex = (start: number, end: number): number => {
+    return Math.floor((start + end) / 2);
+  };
+
+  // Get the movie at the middle of the current search range
+  const currentRanked = (() => {
+    if (!currentCandidate || insertedRankedMovies.length === 0) return null;
+    
+    const middleIndex = getMiddleIndex(searchStart, searchEnd);
+    if (middleIndex >= 0 && middleIndex < insertedRankedMovies.length) {
+      return insertedRankedMovies[middleIndex];
+    }
+    return null;
+  })();
 
   const handleCandidateWins = () => {
     if (!currentCandidate) return;
 
-    // Insert candidate above current ranked movie
-    const newRanked = [...insertedRankedMovies];
-    newRanked.splice(rankedIndex, 0, currentCandidate);
-    setInsertedRankedMovies(newRanked);
+    // User prefers candidate over the middle movie
+    // Candidate belongs somewhere above (before) the middle
+    // Narrow search to upper half: [searchStart, middleIndex)
+    const middleIndex = getMiddleIndex(searchStart, searchEnd);
+    const newEnd = middleIndex;
 
-    // Move to next candidate
-    moveToNextCandidate();
+    console.log('[useInsertionRanking] Candidate wins:', {
+      candidate: currentCandidate.title,
+      comparedTo: insertedRankedMovies[middleIndex]?.title,
+      currentRange: `[${searchStart}, ${searchEnd})`,
+      middleIndex,
+      newRange: `[${searchStart}, ${newEnd})`,
+    });
+
+    if (newEnd <= searchStart) {
+      // Search range narrowed to a single position - insert here
+      const newRanked = [...insertedRankedMovies];
+      newRanked.splice(searchStart, 0, currentCandidate);
+      setInsertedRankedMovies(newRanked);
+      console.log('[useInsertionRanking] Inserted at position', searchStart);
+      moveToNextCandidate();
+    } else {
+      // Continue searching in upper half
+      setSearchEnd(newEnd);
+    }
   };
 
   const handleRankedWins = () => {
     if (!currentCandidate) return;
 
-    // Move to next ranked movie
-    const nextRankedIndex = rankedIndex + 1;
-    
-    if (nextRankedIndex >= insertedRankedMovies.length) {
-      // Reached the bottom - insert candidate at the end
-      const newRanked = [...insertedRankedMovies, currentCandidate];
+    // User prefers the middle ranked movie over candidate
+    // Candidate belongs somewhere below (after) the middle
+    // Narrow search to lower half: [middleIndex + 1, searchEnd)
+    const middleIndex = getMiddleIndex(searchStart, searchEnd);
+    const newStart = middleIndex + 1;
+
+    console.log('[useInsertionRanking] Ranked wins:', {
+      candidate: currentCandidate.title,
+      comparedTo: insertedRankedMovies[middleIndex]?.title,
+      currentRange: `[${searchStart}, ${searchEnd})`,
+      middleIndex,
+      newRange: `[${newStart}, ${searchEnd})`,
+    });
+
+    if (newStart >= searchEnd) {
+      // Search range narrowed to end - insert at the end
+      const newRanked = [...insertedRankedMovies];
+      newRanked.splice(searchEnd, 0, currentCandidate);
       setInsertedRankedMovies(newRanked);
+      console.log('[useInsertionRanking] Inserted at end position', searchEnd);
       moveToNextCandidate();
     } else {
-      // Continue comparing with next ranked movie
-      setRankedIndex(nextRankedIndex);
+      // Continue searching in lower half
+      setSearchStart(newStart);
     }
   };
 
   const handleCantDecide = () => {
     if (!currentCandidate) return;
 
-    // Move to next ranked movie without inserting
-    const nextRankedIndex = rankedIndex + 1;
+    // Can't decide: place the candidate right next to the current comparison
+    // Insert it right after the middle movie (neutral placement)
+    const middleIndex = getMiddleIndex(searchStart, searchEnd);
+    const newRanked = [...insertedRankedMovies];
     
-    if (nextRankedIndex >= insertedRankedMovies.length) {
-      // Reached the bottom and user couldn't decide on any
-      // Skip this movie (don't insert it) so it stays in the
-      // Movies to Rank queue for a future session.
-      setSkippedMovies(prev => [...prev, currentCandidate]);
-      moveToNextCandidate();
-    } else {
-      // Continue comparing with next ranked movie
-      setRankedIndex(nextRankedIndex);
-    }
+    // Insert after the middle movie (or at end if middle is last)
+    const insertIndex = Math.min(middleIndex + 1, insertedRankedMovies.length);
+    newRanked.splice(insertIndex, 0, currentCandidate);
+    setInsertedRankedMovies(newRanked);
+    
+    console.log('[useInsertionRanking] Can\'t decide - placed candidate at index', insertIndex);
+    moveToNextCandidate();
   };
 
   const moveToNextCandidate = () => {
@@ -92,13 +138,18 @@ function useInsertionRanking(
       // All candidates processed
       setIsComplete(true);
     } else {
-      // Move to next candidate and reset ranked index
+      // Move to next candidate and reset search range
       setCandidateIndex(nextCandidateIndex);
-      setRankedIndex(0);
+      // Reset search range to full list for next candidate
+      setInsertedRankedMovies(prev => {
+        setSearchStart(0);
+        setSearchEnd(prev.length);
+        return prev;
+      });
     }
   };
 
-  // Initialize: Reset state and auto-insert first candidate when movies change
+  // Initialize: Reset state and set up binary search range when movies change
   // This effect runs whenever candidateMovies or existingRankedMovies change (new session)
   useEffect(() => {
     console.log('[useInsertionRanking] Initialization effect running:', {
@@ -108,9 +159,7 @@ function useInsertionRanking(
     });
     
     // Reset state for new session when movies change
-    // Reset indices and completion state
     setCandidateIndex(0);
-    setRankedIndex(0);
     setIsComplete(false);
     setSkippedMovies([]);
     
@@ -118,15 +167,21 @@ function useInsertionRanking(
     const newInsertedRanked = [...existingRankedMovies];
     setInsertedRankedMovies(newInsertedRanked);
     
-    console.log('[useInsertionRanking] Reset state for new session, insertedRankedMovies:', newInsertedRanked.length);
+    // Initialize binary search range for first candidate
+    // Range is [0, listLength) - we'll search the entire list
+    setSearchStart(0);
+    setSearchEnd(newInsertedRanked.length);
+    
+    console.log('[useInsertionRanking] Reset state for new session:', {
+      insertedRankedMovies: newInsertedRanked.length,
+      searchRange: `[0, ${newInsertedRanked.length})`,
+    });
     
     // Auto-insert first candidate if no existing ranked movies
-    // This happens after we've reset insertedRankedMovies to match existingRankedMovies
     if (existingRankedMovies.length === 0 && candidateMovies.length > 0) {
       const firstCandidate = candidateMovies[0];
       if (firstCandidate) {
-        console.log('[useInsertionRanking] Auto-inserting first candidate:', firstCandidate.title);
-        // Use functional update to ensure we're working with the latest state
+        console.log('[useInsertionRanking] Auto-inserting first candidate (no existing rankings):', firstCandidate.title);
         setInsertedRankedMovies([firstCandidate]);
         if (candidateMovies.length === 1) {
           console.log('[useInsertionRanking] Only one candidate, marking complete');
@@ -134,6 +189,9 @@ function useInsertionRanking(
         } else {
           console.log('[useInsertionRanking] Moving to next candidate (index 1)');
           setCandidateIndex(1);
+          // Reset search range for next candidate (but list now has 1 movie)
+          setSearchStart(0);
+          setSearchEnd(1);
         }
       }
     }

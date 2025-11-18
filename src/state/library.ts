@@ -431,8 +431,13 @@ export async function clearAllData(): Promise<void> {
 }
 
 export function counts(): { seen: number; skipped: number; watchlist: number } {
+  // Movies Watched = seen movies + ranked movies
+  // Ranked movies are still considered "watched" even though they're removed from seenIds
+  const rankedIds = new Set(rankedMovies.map(rm => rm.movieId));
+  const seenAndRanked = new Set([...seenIds, ...rankedIds]);
+  
   return {
-    seen: seenIds.size,
+    seen: seenAndRanked.size, // Includes both unranked seen movies and ranked movies
     skipped: skippedIds.size,
     watchlist: watchlistIds.size,
   };

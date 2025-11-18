@@ -7,15 +7,6 @@ interface SearchResultRowProps {
 }
 
 export default function SearchResultRow({ movie, onPress }: SearchResultRowProps) {
-  const hasRatings = 'ratings' in movie && !!movie.ratings;
-  const imdbRating = hasRatings ? movie.ratings?.imdb : undefined;
-  const rtRating = hasRatings ? movie.ratings?.rtCritics : undefined;
-
-  // Calculate Friend Score (average of IMDb and RT, or use tmdbRating as fallback)
-  const friendScore = imdbRating && rtRating
-    ? Math.round((imdbRating * 10 + rtRating) / 2)
-    : Math.round(movie.tmdbRating * 10);
-
   return (
     <TouchableOpacity
       style={styles.container}
@@ -42,23 +33,15 @@ export default function SearchResultRow({ movie, onPress }: SearchResultRowProps
         <Text style={styles.title} numberOfLines={2}>
           {movie.title}
         </Text>
-        <Text style={styles.year}>({movie.year})</Text>
+        <Text style={styles.year}>
+          ({movie.year}){movie.mpaaRating ? ` • ${movie.mpaaRating}` : ''}
+        </Text>
         
         {movie.genres && movie.genres.length > 0 && (
           <Text style={styles.genres} numberOfLines={1}>
             {movie.genres.slice(0, 3).join(', ')}
           </Text>
         )}
-
-        <View style={styles.ratingsRow}>
-          {imdbRating !== undefined && (
-            <Text style={styles.ratingText}>IMDb: {Math.round(imdbRating * 10)}%</Text>
-          )}
-          {rtRating !== undefined && (
-            <Text style={styles.ratingText}>RT: {Math.round(rtRating)}%</Text>
-          )}
-          <Text style={styles.ratingText}>Friend: {friendScore}%</Text>
-        </View>
       </View>
     </TouchableOpacity>
   );
@@ -119,17 +102,6 @@ const styles = StyleSheet.create({
   genres: {
     fontSize: 13,
     color: '#8D6A3A',
-    marginBottom: 8,
-  },
-  ratingsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  ratingText: {
-    fontSize: 12,
-    color: '#7E1616',
-    fontWeight: '500',
   },
 });
 

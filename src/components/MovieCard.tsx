@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Image, Dimensions, ScrollView } from 'react-nat
 import { Ionicons } from '@expo/vector-icons';
 import type { Movie, MovieBase } from '../types/movie';
 import { useFeedPreferences } from '../context/FeedPreferencesContext';
+import { useBlindMode } from '../context/BlindModeContext';
 import type { CardLayoutPreset } from '../types/feedPreferences';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -36,6 +37,7 @@ export default function MovieCard({
   maxHeight,
 }: MovieCardProps) {
   const { feedPreferences } = useFeedPreferences();
+  const { blindModeSettings } = useBlindMode();
   const preset: CardLayoutPreset = feedPreferences.cardLayoutPreset || 'standard';
 
   const hasRatings = 'ratings' in movie && !!movie.ratings;
@@ -174,23 +176,34 @@ export default function MovieCard({
               {imdbRating !== undefined && (
                 <View style={[styles.scoreBadge, styles.imdbBadge]}>
                   <Text style={[styles.scoreLabel, styles.darkText]}>IMDb</Text>
-                  <Text style={[styles.scoreValue, styles.darkText]}>{Math.round(imdbRating * 10)}%</Text>
+                  <Text style={[styles.scoreValue, styles.darkText]}>
+                    {blindModeSettings.hideImdb ? '🍿' : `${Math.round(imdbRating * 10)}%`}
+                  </Text>
                 </View>
               )}
               {rtRating !== undefined && (
                 <View style={[styles.scoreBadge, styles.rtBadge]}>
                   <Text style={[styles.scoreLabel, styles.lightText]}>RT</Text>
-                  <Text style={[styles.scoreValue, styles.lightText]}>{Math.round(rtRating)}%</Text>
+                  <Text style={[styles.scoreValue, styles.lightText]}>
+                    {blindModeSettings.hideRtCritics ? '🍿' : `${Math.round(rtRating)}%`}
+                  </Text>
                 </View>
               )}
+              {/* Friend score is calculated from IMDb/RT or TMDB, so hide if all sources are hidden */}
               <View style={[styles.scoreBadge, styles.friendBadge]}>
                 <Text style={[styles.scoreLabel, styles.lightText]}>Friend</Text>
-                <Text style={[styles.scoreValue, styles.lightText]}>{friendScore}%</Text>
+                <Text style={[styles.scoreValue, styles.lightText]}>
+                  {blindModeSettings.hideImdb && blindModeSettings.hideRtCritics && blindModeSettings.hideTmdb
+                    ? '🍿'
+                    : `${friendScore}%`}
+                </Text>
               </View>
               {movie.butterScore !== undefined && (
                 <View style={[styles.scoreBadge, styles.butterBadge]}>
                   <Text style={[styles.scoreLabel, styles.darkText]}>Butter</Text>
-                  <Text style={[styles.scoreValue, styles.darkText]}>{movie.butterScore}%</Text>
+                  <Text style={[styles.scoreValue, styles.darkText]}>
+                    {blindModeSettings.hideFriendsRating ? '🍿' : `${movie.butterScore}%`}
+                  </Text>
                 </View>
               )}
             </View>
@@ -427,6 +440,9 @@ const styles = StyleSheet.create({
   },
   butterBadge: {
     backgroundColor: '#FFF0B3',
+  },
+  blindModeBadge: {
+    // Popcorn overlay style - keeps badge visible but hides score value
   },
   bottomBadges: {
     flexDirection: 'row',

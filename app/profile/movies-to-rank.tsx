@@ -79,6 +79,15 @@ export default function MoviesToRankScreen() {
           title: 'Movies to Rank',
           headerStyle: { backgroundColor: '#7E1616' },
           headerTintColor: '#FFFEAD',
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={24} color="#FFFEAD" />
+            </TouchableOpacity>
+          ),
           headerRight: () => (
             <TouchableOpacity
               onPress={handleRankNow}
@@ -203,5 +212,9 @@ const styles = StyleSheet.create({
     color: '#FFFEAD',
     fontSize: 16,
     fontWeight: '600',
+  },
+  backButton: {
+    marginLeft: 16,
+    padding: 4,
   },
 });
