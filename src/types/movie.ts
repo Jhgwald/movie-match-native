@@ -14,6 +14,7 @@ export interface MovieBase {
   director?: string;
   cast?: string[];
   language?: string;
+  mpaaRating?: string; // e.g., 'G', 'PG', 'PG-13', 'R', 'NC-17'
 }
 
 export interface MovieRatings {

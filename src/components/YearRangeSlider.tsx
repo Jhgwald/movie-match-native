@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -25,127 +25,154 @@ export default function YearRangeSlider({
   const [trackWidth, setTrackWidth] = useState(SLIDER_WIDTH);
   const [activeThumb, setActiveThumb] = useState<'min' | 'max' | null>(null);
   const trackRef = useRef<View>(null);
-  const trackX = useRef(0);
+  const activeThumbRef = useRef<'min' | 'max' | null>(null);
+  const rangeRef = useRef({ min: valueMin ?? minYear, max: valueMax ?? maxYear });
+  const trackWidthRef = useRef(trackWidth);
+  const minYearRef = useRef(minYear);
+  const maxYearRef = useRef(maxYear);
+  const onValueChangeRef = useRef(onValueChange);
+
+  // Keep refs synced with latest props/state so the pan responder can read them
+  useEffect(() => {
+    trackWidthRef.current = trackWidth;
+  }, [trackWidth]);
+
+  useEffect(() => {
+    minYearRef.current = minYear;
+  }, [minYear]);
+
+  useEffect(() => {
+    maxYearRef.current = maxYear;
+  }, [maxYear]);
+
+  useEffect(() => {
+    onValueChangeRef.current = onValueChange;
+  }, [onValueChange]);
 
   // Default to full range if not set
   const currentMin = valueMin ?? minYear;
   const currentMax = valueMax ?? maxYear;
 
-  const getPositionFromValue = useCallback(
-    (value: number) => {
-      const range = maxYear - minYear;
-      if (range === 0) return 0;
-      const percentage = (value - minYear) / range;
-      return percentage * trackWidth;
-    },
-    [minYear, maxYear, trackWidth]
-  );
+  useEffect(() => {
+    rangeRef.current = { min: currentMin, max: currentMax };
+  }, [currentMin, currentMax]);
 
-  const getValueFromPosition = useCallback(
-    (position: number) => {
-      const percentage = Math.max(0, Math.min(1, position / trackWidth));
-      const value = Math.round(minYear + percentage * (maxYear - minYear));
-      return Math.max(minYear, Math.min(maxYear, value));
-    },
-    [minYear, maxYear, trackWidth]
-  );
-
-  const handleTrackLayout = (event: any) => {
-    const { width, x } = event.nativeEvent.layout;
-    setTrackWidth(width);
-    trackRef.current?.measureInWindow((winX, winY) => {
-      trackX.current = winX;
-    });
+  const updateActiveThumb = (thumb: 'min' | 'max' | null) => {
+    activeThumbRef.current = thumb;
+    setActiveThumb(thumb);
   };
 
-  const updateTrackPosition = useCallback(() => {
-    if (trackRef.current) {
-      trackRef.current.measureInWindow((x, y) => {
-        trackX.current = x;
-      });
-    }
-  }, []);
+  const clampPosition = (position: number) => {
+    const width = trackWidthRef.current;
+    if (width <= 0) return 0;
+    return Math.max(0, Math.min(width, position));
+  };
 
-  useEffect(() => {
-    updateTrackPosition();
-  }, [updateTrackPosition]);
+  const getPositionFromValue = (value: number) => {
+    const minValue = minYearRef.current;
+    const maxValue = maxYearRef.current;
+    const width = trackWidthRef.current;
+    const range = maxValue - minValue;
+    if (range <= 0) return 0;
+    const percentage = (value - minValue) / range;
+    return Math.max(0, Math.min(width, percentage * width));
+  };
+
+  const getValueFromPosition = (position: number) => {
+    const minValue = minYearRef.current;
+    const maxValue = maxYearRef.current;
+    const width = trackWidthRef.current;
+    if (width <= 0) {
+      return minValue;
+    }
+    const percentage = Math.max(0, Math.min(1, position / width));
+    return Math.max(minValue, Math.min(maxValue, Math.round(minValue + percentage * (maxValue - minValue))));
+  };
+
+  const updateRange = (thumb: 'min' | 'max', newValue: number) => {
+    const { min, max } = rangeRef.current;
+    let nextMin = min;
+    let nextMax = max;
+
+    if (thumb === 'min') {
+      nextMin = Math.min(newValue, nextMax);
+    } else {
+      nextMax = Math.max(newValue, nextMin);
+    }
+
+    rangeRef.current = { min: nextMin, max: nextMax };
+    onValueChangeRef.current(nextMin, nextMax);
+  };
+
+  const handleTrackLayout = (event: any) => {
+    const { width } = event.nativeEvent.layout;
+    if (width > 0) {
+      setTrackWidth(width);
+    }
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
-      },
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
-        updateTrackPosition();
-        const touchX = evt.nativeEvent.pageX;
-        const relativeX = touchX - trackX.current;
+        const relativeX = clampPosition(evt.nativeEvent.locationX);
+        const { min, max } = rangeRef.current;
 
-        const minPos = getPositionFromValue(currentMin);
-        const maxPos = getPositionFromValue(currentMax);
+        const minPos = getPositionFromValue(min);
+        const maxPos = getPositionFromValue(max);
 
-        // Determine which thumb is closer
         const distToMin = Math.abs(relativeX - minPos);
         const distToMax = Math.abs(relativeX - maxPos);
 
         if (distToMin < distToMax && distToMin < THUMB_HIT_AREA) {
-          setActiveThumb('min');
+          updateActiveThumb('min');
         } else if (distToMax < THUMB_HIT_AREA) {
-          setActiveThumb('max');
+          updateActiveThumb('max');
         } else if (relativeX < minPos) {
-          // Clicked before min thumb, move min
-          setActiveThumb('min');
+          updateActiveThumb('min');
           const newValue = getValueFromPosition(relativeX);
-          onValueChange(newValue, currentMax);
+          updateRange('min', newValue);
         } else if (relativeX > maxPos) {
-          // Clicked after max thumb, move max
-          setActiveThumb('max');
+          updateActiveThumb('max');
           const newValue = getValueFromPosition(relativeX);
-          onValueChange(currentMin, newValue);
+          updateRange('max', newValue);
         } else {
-          // Clicked between thumbs, move the closer one
-          if (distToMin < distToMax) {
-            setActiveThumb('min');
+          if (distToMin <= distToMax) {
+            updateActiveThumb('min');
           } else {
-            setActiveThumb('max');
+            updateActiveThumb('max');
           }
         }
       },
       onPanResponderMove: (evt) => {
-        if (!activeThumb) return;
+        const thumb = activeThumbRef.current;
+        if (!thumb) return;
 
-        const touchX = evt.nativeEvent.pageX;
-        const relativeX = Math.max(0, Math.min(trackWidth, touchX - trackX.current));
+        const relativeX = clampPosition(evt.nativeEvent.locationX);
         const newValue = getValueFromPosition(relativeX);
-
-        if (activeThumb === 'min') {
-          // Ensure min doesn't exceed max
-          const newMin = Math.min(newValue, currentMax);
-          onValueChange(newMin, currentMax);
-        } else {
-          // Ensure max doesn't go below min
-          const newMax = Math.max(newValue, currentMin);
-          onValueChange(currentMin, newMax);
-        }
+        updateRange(thumb, newValue);
       },
       onPanResponderRelease: () => {
-        setActiveThumb(null);
+        updateActiveThumb(null);
       },
       onPanResponderTerminate: () => {
-        setActiveThumb(null);
+        updateActiveThumb(null);
       },
     })
   ).current;
 
   const minPosition = getPositionFromValue(currentMin);
   const maxPosition = getPositionFromValue(currentMax);
+  const isFullRange = currentMin === minYear && currentMax === maxYear;
+  const rangeLabel = isFullRange
+    ? `${minYear} – Present`
+    : `${currentMin} – ${currentMax}`;
 
   return (
     <View style={styles.container}>
       {/* Year range display */}
-      <Text style={styles.rangeText}>
-        Year range: {currentMin} – {currentMax}
-      </Text>
+      <Text style={styles.rangeText}>{rangeLabel}</Text>
 
       {/* Slider track */}
       <View
@@ -163,7 +190,7 @@ export default function YearRangeSlider({
             styles.activeTrack,
             {
               left: minPosition,
-              width: maxPosition - minPosition,
+              width: Math.max(0, maxPosition - minPosition),
             },
           ]}
         />
@@ -245,4 +272,3 @@ const styles = StyleSheet.create({
     borderColor: '#DC2026',
   },
 });
-

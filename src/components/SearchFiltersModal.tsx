@@ -178,8 +178,17 @@ export default function SearchFiltersModal({
                 valueMax={localFilters.maxYear}
                 onValueChange={(min, max) => {
                   const currentYear = new Date().getFullYear();
-                  // If range is full (1900 to current year), clear the filter
-                  if (min === 1900 && max === currentYear) {
+                  const safeMin = min ?? 1900;
+                  const safeMax = max ?? currentYear;
+                  const isFullRange = safeMin === 1900 && safeMax === currentYear;
+
+                  console.log(
+                    `[SearchFilters] Year range changed: ${safeMin} – ${
+                      safeMax === currentYear ? 'Present' : safeMax
+                    }`
+                  );
+
+                  if (isFullRange) {
                     setLocalFilters({
                       ...localFilters,
                       minYear: undefined,
@@ -188,8 +197,8 @@ export default function SearchFiltersModal({
                   } else {
                     setLocalFilters({
                       ...localFilters,
-                      minYear: min,
-                      maxYear: max,
+                      minYear: safeMin,
+                      maxYear: safeMax,
                     });
                   }
                 }}
@@ -371,4 +380,3 @@ const styles = StyleSheet.create({
     color: '#FFFEAD',
   },
 });
-

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,10 @@ function SearchContent() {
     return results;
   }, [searchFilters, sortOption]);
 
+  useEffect(() => {
+    console.log(`[Search] ${filteredMovies.length} movies match current filters`);
+  }, [filteredMovies.length]);
+
   const handleMoviePress = (movie: MovieBase | Movie) => {
     setSelectedMovie(movie);
     setDetailsVisible(true);
@@ -103,55 +107,60 @@ function SearchContent() {
     filters.maxYear !== undefined ||
     (filters.streamingServices && filters.streamingServices.length > 0);
 
-  const HEADER_HEIGHT = 56;
+  const listContentStyle = useMemo(
+    () => [styles.listContent, { paddingBottom: 16 + insets.bottom }],
+    [insets.bottom]
+  );
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Text style={styles.headerTitle}>Search</Text>
-        <TouchableOpacity
-          onPress={() => setFiltersVisible(true)}
-          style={styles.filtersButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons
-            name="options"
-            size={24}
-            color={hasActiveFilters ? '#DC2026' : '#FFFEAD'}
-          />
-          {hasActiveFilters && <View style={styles.filterBadge} />}
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#8e8e93" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search for a movie…"
-          placeholderTextColor="#8e8e93"
-          value={query}
-          onChangeText={setQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {query.length > 0 && (
+      {/* Header + Search Bar */}
+      <View style={[styles.headerSection, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Search</Text>
           <TouchableOpacity
-            onPress={() => setQuery('')}
-            style={styles.clearButton}
+            onPress={() => setFiltersVisible(true)}
+            style={styles.filtersButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close-circle" size={20} color="#8e8e93" />
+            <Ionicons
+              name="options"
+              size={24}
+              color={hasActiveFilters ? '#DC2026' : '#FFFEAD'}
+            />
+            {hasActiveFilters && <View style={styles.filterBadge} />}
           </TouchableOpacity>
-        )}
+        </View>
+
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#8e8e93" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for a movie…"
+            placeholderTextColor="#8e8e93"
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {query.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setQuery('')}
+              style={styles.clearButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close-circle" size={20} color="#8e8e93" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Results */}
       {filteredMovies.length > 0 ? (
         <FlatList
+          style={styles.resultsList}
           data={filteredMovies}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -160,7 +169,7 @@ function SearchContent() {
               onPress={() => handleMoviePress(item)}
             />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <View style={styles.resultsHeader}>
@@ -269,15 +278,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#6B0000',
   },
-  header: {
+  headerSection: {
     backgroundColor: '#7E1616',
     paddingHorizontal: 16,
     paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DC2026',
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#DC2026',
+    marginBottom: 12,
   },
   headerTitle: {
     fontSize: 28,
@@ -303,11 +315,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#1c1c1e',
     borderRadius: 10,
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    marginTop: 0,
+    width: '100%',
   },
   searchIcon: {
     marginRight: 8,
@@ -323,14 +334,16 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+  },
+  resultsList: {
+    flex: 1,
   },
   resultsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
-    marginTop: 8,
+    marginTop: 0,
   },
   resultsCount: {
     fontSize: 14,

@@ -21,6 +21,7 @@ export const movies: readonly Movie[] = [
     director: 'Christopher Nolan',
     cast: ['Cillian Murphy', 'Emily Blunt', 'Matt Damon', 'Robert Downey Jr.', 'Florence Pugh'],
     language: 'English',
+    mpaaRating: 'R',
   },
   {
     id: '2',
@@ -42,6 +43,7 @@ export const movies: readonly Movie[] = [
     director: 'Denis Villeneuve',
     cast: ['Timothée Chalamet', 'Rebecca Ferguson', 'Oscar Isaac', 'Zendaya', 'Jason Momoa'],
     language: 'English',
+    mpaaRating: 'PG-13',
   },
   {
     id: '3',
@@ -63,6 +65,7 @@ export const movies: readonly Movie[] = [
     director: 'Daniel Kwan',
     cast: ['Michelle Yeoh', 'Stephanie Hsu', 'Ke Huy Quan', 'Jamie Lee Curtis'],
     language: 'English',
+    mpaaRating: 'R',
   },
   {
     id: '4',
@@ -84,6 +87,7 @@ export const movies: readonly Movie[] = [
     director: 'Christopher Nolan',
     cast: ['Leonardo DiCaprio', 'Marion Cotillard', 'Tom Hardy', 'Ellen Page', 'Joseph Gordon-Levitt'],
     language: 'English',
+    mpaaRating: 'PG-13',
   },
   {
     id: '5',
@@ -105,6 +109,7 @@ export const movies: readonly Movie[] = [
     director: 'Matt Reeves',
     cast: ['Robert Pattinson', 'Zoë Kravitz', 'Paul Dano', 'Colin Farrell'],
     language: 'English',
+    mpaaRating: 'PG-13',
   },
   {
     id: '6',
@@ -126,6 +131,7 @@ export const movies: readonly Movie[] = [
     director: 'Bong Joon-ho',
     cast: ['Song Kang-ho', 'Lee Sun-kyun', 'Cho Yeo-jeong', 'Choi Woo-shik'],
     language: 'Korean',
+    mpaaRating: 'R',
   },
   {
     id: '7',
@@ -147,6 +153,7 @@ export const movies: readonly Movie[] = [
     director: 'Christopher Nolan',
     cast: ['Matthew McConaughey', 'Anne Hathaway', 'Jessica Chastain', 'Michael Caine'],
     language: 'English',
+    mpaaRating: 'PG-13',
   },
   {
     id: '8',
@@ -168,6 +175,7 @@ export const movies: readonly Movie[] = [
     director: 'Jon Watts',
     cast: ['Tom Holland', 'Zendaya', 'Benedict Cumberbatch', 'Willem Dafoe'],
     language: 'English',
+    mpaaRating: 'PG-13',
   },
   {
     id: '9',
@@ -189,6 +197,7 @@ export const movies: readonly Movie[] = [
     director: 'George Miller',
     cast: ['Tom Hardy', 'Charlize Theron', 'Nicholas Hoult', 'Hugh Keays-Byrne'],
     language: 'English',
+    mpaaRating: 'R',
   },
   {
     id: '10',
@@ -210,5 +219,6 @@ export const movies: readonly Movie[] = [
     director: 'Greta Gerwig',
     cast: ['Margot Robbie', 'Ryan Gosling', 'America Ferrera', 'Kate McKinnon'],
     language: 'English',
+    mpaaRating: 'PG-13',
   },
 ] as const;

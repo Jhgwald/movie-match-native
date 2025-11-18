@@ -112,8 +112,10 @@ export default function MovieCard({
             {/* Title */}
             <Text style={styles.movieTitle}>{movie.title}</Text>
 
-            {/* Year */}
-            <Text style={styles.yearText}>({movie.year})</Text>
+            {/* Year and Rating */}
+            <Text style={styles.yearText}>
+              ({movie.year}){movie.mpaaRating ? ` • ${movie.mpaaRating}` : ''}
+            </Text>
 
             {/* Genres - shown in all presets */}
             {movie.genres && movie.genres.length > 0 && (
