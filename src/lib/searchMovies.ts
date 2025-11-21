@@ -1,11 +1,22 @@
 import type { MovieBase } from '../types/movie';
 
+export interface CastFilter {
+  id: number;
+  name: string;
+}
+
+export type PeopleMatchMode = 'OR' | 'AND';
+
 export type SearchFilters = {
   query?: string;
   genres?: string[];
   minYear?: number;
   maxYear?: number;
+  minLength?: number;
+  maxLength?: number;
   streamingServices?: string[];
+  cast?: CastFilter[];
+  castMatchMode?: PeopleMatchMode; // Default: 'OR'
 };
 
 /**
@@ -53,6 +64,19 @@ export function searchMovies(
     results = results.filter((movie) => movie.year <= filters.maxYear!);
   }
 
+  // Filter by runtime length (minutes)
+  if (filters.minLength !== undefined && filters.minLength !== null) {
+    results = results.filter((movie) => 
+      movie.runtimeMinutes !== undefined && movie.runtimeMinutes >= filters.minLength!
+    );
+  }
+
+  if (filters.maxLength !== undefined && filters.maxLength !== null) {
+    results = results.filter((movie) => 
+      movie.runtimeMinutes !== undefined && movie.runtimeMinutes <= filters.maxLength!
+    );
+  }
+
   // Filter by streaming services (movie must have at least one selected service)
   if (filters.streamingServices && filters.streamingServices.length > 0) {
     results = results.filter((movie) => {
@@ -62,6 +86,31 @@ export function searchMovies(
       return filters.streamingServices!.some((selectedService) =>
         movie.streamingPlatforms!.includes(selectedService)
       );
+    });
+  }
+
+  // Filter by cast (supports OR and AND modes)
+  if (filters.cast && filters.cast.length > 0) {
+    const matchMode = filters.castMatchMode || 'OR'; // Default to OR
+    const selectedActorNames = filters.cast.map((actor) => actor.name.toLowerCase());
+    
+    results = results.filter((movie) => {
+      if (!movie.cast || movie.cast.length === 0) {
+        return false;
+      }
+      const movieCastLower = movie.cast.map((name) => name.toLowerCase());
+      
+      if (matchMode === 'AND') {
+        // Movie must contain ALL selected actors
+        return selectedActorNames.every((selectedName) =>
+          movieCastLower.some((castName) => castName.includes(selectedName) || selectedName.includes(castName))
+        );
+      } else {
+        // OR mode: Movie must contain at least ONE selected actor
+        return selectedActorNames.some((selectedName) =>
+          movieCastLower.some((castName) => castName.includes(selectedName) || selectedName.includes(castName))
+        );
+      }
     });
   }
 

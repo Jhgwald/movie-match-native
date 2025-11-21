@@ -165,3 +165,137 @@ export function toMovie(base: MovieBase, details: MovieDetails): MovieBase {
   };
 }
 
+export interface Person {
+  id: number;
+  name: string;
+  knownFor?: string; // Known for department or popular work
+}
+
+interface TMDbPerson {
+  id: number;
+  name: string;
+  known_for_department?: string;
+  known_for?: Array<{ title?: string; name?: string }>;
+}
+
+interface TMDbPeopleSearchResponse {
+  results: TMDbPerson[];
+}
+
+// Mock data for testing when TMDB is not configured
+// Actors from the actual movies in the app
+const MOCK_PEOPLE: Person[] = [
+  // Oppenheimer
+  { id: 1, name: 'Cillian Murphy', knownFor: 'Oppenheimer' },
+  { id: 2, name: 'Emily Blunt', knownFor: 'Oppenheimer' },
+  { id: 3, name: 'Matt Damon', knownFor: 'Oppenheimer' },
+  { id: 4, name: 'Robert Downey Jr.', knownFor: 'Oppenheimer' },
+  { id: 5, name: 'Florence Pugh', knownFor: 'Oppenheimer' },
+  // Dune
+  { id: 6, name: 'Timothée Chalamet', knownFor: 'Dune' },
+  { id: 7, name: 'Rebecca Ferguson', knownFor: 'Dune' },
+  { id: 8, name: 'Oscar Isaac', knownFor: 'Dune' },
+  { id: 9, name: 'Zendaya', knownFor: 'Dune' },
+  { id: 10, name: 'Jason Momoa', knownFor: 'Dune' },
+  // Everything Everywhere All at Once
+  { id: 11, name: 'Michelle Yeoh', knownFor: 'Everything Everywhere All at Once' },
+  { id: 12, name: 'Stephanie Hsu', knownFor: 'Everything Everywhere All at Once' },
+  { id: 13, name: 'Ke Huy Quan', knownFor: 'Everything Everywhere All at Once' },
+  { id: 14, name: 'Jamie Lee Curtis', knownFor: 'Everything Everywhere All at Once' },
+  // Inception
+  { id: 15, name: 'Leonardo DiCaprio', knownFor: 'Inception' },
+  { id: 16, name: 'Marion Cotillard', knownFor: 'Inception' },
+  { id: 17, name: 'Tom Hardy', knownFor: 'Inception' },
+  { id: 18, name: 'Ellen Page', knownFor: 'Inception' },
+  { id: 19, name: 'Joseph Gordon-Levitt', knownFor: 'Inception' },
+  // The Batman
+  { id: 20, name: 'Robert Pattinson', knownFor: 'The Batman' },
+  { id: 21, name: 'Zoë Kravitz', knownFor: 'The Batman' },
+  { id: 22, name: 'Paul Dano', knownFor: 'The Batman' },
+  { id: 23, name: 'Colin Farrell', knownFor: 'The Batman' },
+  // Parasite
+  { id: 24, name: 'Song Kang-ho', knownFor: 'Parasite' },
+  { id: 25, name: 'Lee Sun-kyun', knownFor: 'Parasite' },
+  { id: 26, name: 'Cho Yeo-jeong', knownFor: 'Parasite' },
+  { id: 27, name: 'Choi Woo-shik', knownFor: 'Parasite' },
+  // Interstellar
+  { id: 28, name: 'Matthew McConaughey', knownFor: 'Interstellar' },
+  { id: 29, name: 'Anne Hathaway', knownFor: 'Interstellar' },
+  { id: 30, name: 'Jessica Chastain', knownFor: 'Interstellar' },
+  { id: 31, name: 'Michael Caine', knownFor: 'Interstellar' },
+  // Spider-Man: No Way Home
+  { id: 32, name: 'Tom Holland', knownFor: 'Spider-Man: No Way Home' },
+  { id: 33, name: 'Benedict Cumberbatch', knownFor: 'Spider-Man: No Way Home' },
+  { id: 34, name: 'Willem Dafoe', knownFor: 'Spider-Man: No Way Home' },
+  // Mad Max: Fury Road
+  { id: 35, name: 'Charlize Theron', knownFor: 'Mad Max: Fury Road' },
+  { id: 36, name: 'Nicholas Hoult', knownFor: 'Mad Max: Fury Road' },
+  { id: 37, name: 'Hugh Keays-Byrne', knownFor: 'Mad Max: Fury Road' },
+  // Barbie
+  { id: 38, name: 'Margot Robbie', knownFor: 'Barbie' },
+  { id: 39, name: 'Ryan Gosling', knownFor: 'Barbie' },
+  { id: 40, name: 'America Ferrera', knownFor: 'Barbie' },
+  { id: 41, name: 'Kate McKinnon', knownFor: 'Barbie' },
+];
+
+export async function searchPeople(query: string): Promise<Person[]> {
+  if (!query.trim()) {
+    console.log('[searchPeople] Empty query, returning empty array');
+    return [];
+  }
+
+  // Fallback to mock data when TMDB is not configured
+  if (!HAS_TMDB || !TMDB_KEY) {
+    console.warn('[searchPeople] TMDB not configured, using mock data');
+    const queryLower = query.trim().toLowerCase();
+    const mockResults = MOCK_PEOPLE.filter((person) =>
+      person.name.toLowerCase().includes(queryLower)
+    ).slice(0, 10);
+    console.log('[searchPeople] Mock results:', mockResults.length);
+    return mockResults;
+  }
+
+  try {
+    const url = `${TMDB_BASE_URL}/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(query.trim())}`;
+    console.log('[searchPeople] Fetching from:', url.replace(TMDB_KEY, '***'));
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error('[searchPeople] Response not OK:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('[searchPeople] Error response:', errorText);
+      return [];
+    }
+    
+    const data: TMDbPeopleSearchResponse = await response.json();
+    console.log('[searchPeople] Raw response:', JSON.stringify(data).substring(0, 200));
+    
+    if (!data.results) {
+      console.warn('[searchPeople] No results array in response');
+      return [];
+    }
+    
+    const people = (data.results || []).slice(0, 10).map((person): Person => {
+      // Get known_for title if available
+      const knownFor = person.known_for?.[0]?.title || person.known_for?.[0]?.name || person.known_for_department || 'Actor';
+      
+      return {
+        id: person.id,
+        name: person.name,
+        knownFor,
+      };
+    });
+    
+    console.log('[searchPeople] Returning', people.length, 'people');
+    return people;
+  } catch (error) {
+    console.error('[searchPeople] Failed to search people:', error);
+    if (error instanceof Error) {
+      console.error('[searchPeople] Error message:', error.message);
+      console.error('[searchPeople] Error stack:', error.stack);
+    }
+    return [];
+  }
+}
+

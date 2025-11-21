@@ -36,6 +36,19 @@ function SearchContent() {
   const [sortOption, setSortOption] = useState<SortOption>('relevance');
   const [sortModalVisible, setSortModalVisible] = useState(false);
 
+  const { minYearAvailable, maxYearAvailable } = useMemo(() => {
+    if (sampleMovies.length === 0) {
+      const currentYear = new Date().getFullYear();
+      return { minYearAvailable: 1900, maxYearAvailable: currentYear };
+    }
+
+    const years = sampleMovies.map((movie) => movie.year);
+    return {
+      minYearAvailable: Math.min(...years),
+      maxYearAvailable: Math.max(...years),
+    };
+  }, []);
+
   // Combine query with filters for search
   const searchFilters: SearchFilters = useMemo(
     () => ({
@@ -103,9 +116,161 @@ function SearchContent() {
 
   const hasActiveFilters =
     (filters.genres && filters.genres.length > 0) ||
-    filters.minYear !== undefined ||
-    filters.maxYear !== undefined ||
-    (filters.streamingServices && filters.streamingServices.length > 0);
+    (filters.minYear !== undefined && filters.minYear > minYearAvailable) ||
+    (filters.maxYear !== undefined && filters.maxYear < maxYearAvailable) ||
+    filters.minLength !== undefined ||
+    filters.maxLength !== undefined ||
+    (filters.streamingServices && filters.streamingServices.length > 0) ||
+    (filters.cast && filters.cast.length > 0);
+
+  const removeGenreFilter = (genre: string) => {
+    if (!filters.genres) return;
+    const updatedGenres = filters.genres.filter((g) => g !== genre);
+    setFilters((prev) => ({
+      ...prev,
+      genres: updatedGenres.length > 0 ? updatedGenres : undefined,
+    }));
+  };
+
+  const removeServiceFilter = (service: string) => {
+    if (!filters.streamingServices) return;
+    const updatedServices = filters.streamingServices.filter((s) => s !== service);
+    setFilters((prev) => ({
+      ...prev,
+      streamingServices: updatedServices.length > 0 ? updatedServices : undefined,
+    }));
+  };
+
+  const removeYearFilter = () => {
+    setFilters((prev) => ({
+      ...prev,
+      minYear: undefined,
+      maxYear: undefined,
+    }));
+  };
+
+  const removeLengthFilter = () => {
+    setFilters((prev) => ({
+      ...prev,
+      minLength: undefined,
+      maxLength: undefined,
+    }));
+  };
+
+  const removeCastFilter = (actorId: number) => {
+    if (!filters.cast) return;
+    const matchMode = filters.castMatchMode || 'OR';
+    
+    if (matchMode === 'AND') {
+      // In AND mode, removing one chip clears all cast filters
+      setFilters((prev) => ({
+        ...prev,
+        cast: undefined,
+        castMatchMode: undefined,
+      }));
+    } else {
+      // In OR mode, remove just that one actor
+      const updatedCast = filters.cast.filter((actor) => actor.id !== actorId);
+      setFilters((prev) => ({
+        ...prev,
+        cast: updatedCast.length > 0 ? updatedCast : undefined,
+      }));
+    }
+  };
+
+  const clearAllFilters = () => {
+    setFilters({});
+  };
+
+  const renderActiveFilterChips = () => {
+    if (!hasActiveFilters) return null;
+
+    const chips: { label: string; onRemove: () => void }[] = [];
+
+    filters.genres?.forEach((genre) => {
+      chips.push({ label: genre, onRemove: () => removeGenreFilter(genre) });
+    });
+
+    if (filters.minYear !== undefined || filters.maxYear !== undefined) {
+      let label: string | null = null;
+      if (filters.minYear !== undefined && filters.maxYear !== undefined) {
+        label = `Year: ${filters.minYear}–${filters.maxYear}`;
+      } else if (filters.minYear !== undefined) {
+        label = `after ${filters.minYear}`;
+      } else if (filters.maxYear !== undefined) {
+        label = `before ${filters.maxYear}`;
+      }
+      if (label) {
+        chips.push({ label, onRemove: removeYearFilter });
+      }
+    }
+
+    if (filters.minLength !== undefined || filters.maxLength !== undefined) {
+      let label: string | null = null;
+      if (filters.minLength !== undefined && filters.maxLength !== undefined) {
+        label = `Length: ${filters.minLength}–${filters.maxLength} min`;
+      } else if (filters.minLength !== undefined) {
+        label = `Length: after ${filters.minLength} min`;
+      } else if (filters.maxLength !== undefined) {
+        label = `Length: before ${filters.maxLength} min`;
+      }
+      if (label) {
+        chips.push({ label, onRemove: removeLengthFilter });
+      }
+    }
+
+    filters.streamingServices?.forEach((service) => {
+      chips.push({ label: service, onRemove: () => removeServiceFilter(service) });
+    });
+
+    // Cast chips - different rendering based on match mode
+    if (filters.cast && filters.cast.length > 0) {
+      const matchMode = filters.castMatchMode || 'OR';
+      
+      if (matchMode === 'AND') {
+        // AND mode: Show all actors in one combined chip
+        const castNames = filters.cast.map((actor) => actor.name).join(', ');
+        chips.push({
+          label: `Cast: ${castNames}`,
+          onRemove: () => {
+            setFilters((prev) => ({
+              ...prev,
+              cast: undefined,
+              castMatchMode: undefined,
+            }));
+          },
+        });
+      } else {
+        // OR mode: Show each actor as a separate chip
+        filters.cast.forEach((actor) => {
+          chips.push({
+            label: actor.name,
+            onRemove: () => removeCastFilter(actor.id),
+          });
+        });
+      }
+    }
+
+    return (
+      <View style={styles.activeFiltersContainer}>
+        <View style={styles.activeFiltersChips}>
+          {chips.map((chip, index) => (
+            <TouchableOpacity
+              key={`${chip.label}-${index}`}
+              style={styles.filterChip}
+              onPress={chip.onRemove}
+            >
+              <Text style={styles.filterChipText}>{chip.label}</Text>
+              <Ionicons name="close" size={14} color="#3a2b1a" />
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TouchableOpacity onPress={clearAllFilters} style={styles.clearAllChipsButton}>
+          <Text style={styles.clearAllChipsText}>Clear all</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const listContentStyle = useMemo(
     () => [styles.listContent, { paddingBottom: 16 + insets.bottom }],
@@ -156,6 +321,9 @@ function SearchContent() {
           )}
         </View>
       </View>
+
+      {/* Active Filters Chips */}
+      {renderActiveFilterChips()}
 
       {/* Results */}
       {filteredMovies.length > 0 ? (
@@ -264,6 +432,8 @@ function SearchContent() {
         filters={filters}
         onApply={handleApplyFilters}
         onClose={() => setFiltersVisible(false)}
+        minAvailableYear={minYearAvailable}
+        maxAvailableYear={maxYearAvailable}
       />
     </View>
   );
@@ -417,5 +587,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8e8e93',
     textAlign: 'center',
+  },
+  activeFiltersContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    backgroundColor: '#6B0000',
+  },
+  activeFiltersChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FFFEAD',
+    gap: 6,
+  },
+  filterChipText: {
+    color: '#3a2b1a',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  clearAllChipsButton: {
+    marginTop: 4,
+    alignSelf: 'flex-end',
+    padding: 4,
+  },
+  clearAllChipsText: {
+    color: '#FFFEAD',
+    fontSize: 12,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });
