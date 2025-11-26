@@ -6,8 +6,7 @@ import { useBlindMode } from '../context/BlindModeContext';
 import type { CardLayoutPreset } from '../types/feedPreferences';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TICKET_MAX_WIDTH = Math.min(SCREEN_WIDTH - 32, 400);
-const NOTCH_RADIUS = 20;
+const CARD_MAX_WIDTH = Math.min(SCREEN_WIDTH - 32, 400);
 
 interface MovieCardProps {
   movie: MovieBase | Movie;
@@ -49,11 +48,6 @@ export default function MovieCard({
     ? Math.round((imdbRating * 10 + rtRating) / 2)
     : Math.round(movie.tmdbRating * 10);
 
-  // Generate serial number
-  const numericFragment = movie.id.replace(/\D/g, '');
-  const fallbackSerialSeed = `${movie.year}${Math.round(movie.tmdbRating * 10)}`;
-  const serialNumber = (numericFragment || fallbackSerialSeed).padStart(6, '0').slice(-6);
-
   // Truncate description
   const shortDescription = truncateDescription(movie.description);
 
@@ -76,11 +70,8 @@ export default function MovieCard({
 
   return (
     <View style={styles.card}>
-      <View style={[styles.ticketContainer, { borderColor }, maxHeight ? { maxHeight, height: maxHeight } : {}]}>
-        <View style={styles.notchLeft} pointerEvents="none" />
-        <View style={styles.notchRight} pointerEvents="none" />
-        
-        <View style={styles.ticketBody}>
+      <View style={[styles.cardContainer, { borderColor }, maxHeight ? { maxHeight, height: maxHeight } : {}]}>
+        <View style={styles.cardBody}>
           <ScrollView 
             style={styles.scrollContent}
             contentContainerStyle={styles.scrollContentContainer}
@@ -89,7 +80,6 @@ export default function MovieCard({
             overScrollMode="never"
             scrollEventThrottle={16}
           >
-            <Text style={styles.featureLabel}>FEATURE PRESENTATION</Text>
 
             {/* Poster - size varies by preset */}
             <View style={[
@@ -207,16 +197,6 @@ export default function MovieCard({
                 </View>
               )}
             </View>
-
-            {/* ADMIT ONE and Serial Number */}
-            <View style={styles.bottomBadges}>
-              <View style={styles.admitOneBadge}>
-                <Text style={styles.admitOneText}>ADMIT ONE</Text>
-              </View>
-              <View style={styles.serialNumber}>
-                <Text style={styles.serialText}>No. {serialNumber}</Text>
-              </View>
-            </View>
           </View>
         </View>
       </View>
@@ -226,15 +206,15 @@ export default function MovieCard({
 
 const styles = StyleSheet.create({
   card: {
-    width: TICKET_MAX_WIDTH,
+    width: CARD_MAX_WIDTH,
     alignSelf: 'center',
   },
-  ticketContainer: {
+  cardContainer: {
     backgroundColor: '#FDF4E0',
-    borderRadius: 0,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#A0452E',
-    overflow: 'visible',
+    overflow: 'hidden',
     width: '100%',
     position: 'relative',
     shadowColor: '#3a2b1a',
@@ -243,29 +223,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  notchLeft: {
-    position: 'absolute',
-    left: -NOTCH_RADIUS,
-    top: '50%',
-    width: NOTCH_RADIUS * 2,
-    height: NOTCH_RADIUS * 2,
-    borderRadius: NOTCH_RADIUS,
-    backgroundColor: '#6B0000',
-    marginTop: -NOTCH_RADIUS,
-    zIndex: 1,
-  },
-  notchRight: {
-    position: 'absolute',
-    right: -NOTCH_RADIUS,
-    top: '50%',
-    width: NOTCH_RADIUS * 2,
-    height: NOTCH_RADIUS * 2,
-    borderRadius: NOTCH_RADIUS,
-    backgroundColor: '#6B0000',
-    marginTop: -NOTCH_RADIUS,
-    zIndex: 1,
-  },
-  ticketBody: {
+  cardBody: {
     flex: 1,
     backgroundColor: 'transparent',
     overflow: 'hidden',
@@ -279,15 +237,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 20,
-  },
-  featureLabel: {
-    fontSize: 12,
-    letterSpacing: 2,
-    color: '#7A4C2D',
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontWeight: '600',
   },
   posterContainer: {
     alignSelf: 'center',
@@ -443,33 +392,5 @@ const styles = StyleSheet.create({
   },
   blindModeBadge: {
     // Popcorn overlay style - keeps badge visible but hides score value
-  },
-  bottomBadges: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  admitOneBadge: {
-    borderWidth: 2,
-    borderColor: '#7E1616',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#FDF4E0',
-  },
-  admitOneText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#3a2b1a',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  serialNumber: {},
-  serialText: {
-    fontSize: 10,
-    letterSpacing: 1,
-    color: '#8D6A3A',
-    fontWeight: '500',
-    fontFamily: 'monospace',
   },
 });

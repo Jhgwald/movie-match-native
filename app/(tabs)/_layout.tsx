@@ -124,6 +124,7 @@ export default function TabLayout() {
           name="profile"
           options={{
             title: 'Profile',
+            headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <ProfileTabIcon color={color} size={size} />
             ),

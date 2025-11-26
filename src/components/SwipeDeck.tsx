@@ -18,27 +18,12 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 100;
 const VELOCITY_THRESHOLD = 0.5;
 const INDICATOR_THRESHOLD = 30;
-
-interface ThrowConfig {
-  arcPeakX?: number;
-  arcPeakY?: number;
-  liftDuration?: number;
-  diveDuration?: number;
-  peakScale?: number;
-  finalScale?: number;
-  liftOpacity?: number;
-  finalOpacity?: number;
-  impactOffsetX?: number;
-  impactOffsetY?: number;
-  easingUp?: (value: number) => number;
-  easingDown?: (value: number) => number;
-}
+const DETAILS_OPEN_THRESHOLD = SCREEN_HEIGHT * 0.3; // Open when swiped 30% of screen height
 
 interface SwipeDeckProps {
   movies: readonly (MovieBase | Movie)[];
   onSwipeRight?: (movie: MovieBase | Movie) => void;
   onSwipeLeft?: (movie: MovieBase | Movie) => void;
-  onSwipeUp?: (movie: MovieBase | Movie) => void;
   onSwipeDown?: (movie: MovieBase | Movie) => void;
   onDetails?: (movie: MovieBase | Movie) => void;
   onProfileShake?: () => void;
@@ -81,7 +66,6 @@ export default function SwipeDeck({
   movies,
   onSwipeRight,
   onSwipeLeft,
-  onSwipeUp,
   onSwipeDown,
   onDetails,
   onProfileShake,
@@ -98,17 +82,24 @@ export default function SwipeDeck({
   const cardOpacity = useRef(new Animated.Value(1)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const labelOpacity = useRef(new Animated.Value(0)).current;
-  const labelDirection = useRef<'right' | 'left' | 'up' | 'down' | null>(null);
+  const labelDirection = useRef<'right' | 'left' | 'down' | null>(null);
   const isAnimating = useRef(false);
+  const hasMoved = useRef(false); // Track if user has moved finger (to distinguish tap from swipe)
+  const gestureMovieRef = useRef<MovieBase | Movie | null>(null); // Store movie captured at gesture start
+  const gestureIndexRef = useRef<number | null>(null); // Store index captured at gesture start
   const cardRef = useRef<View | null>(null);
   const cardCenter = useRef<{ x: number; y: number }>({
     x: SCREEN_WIDTH / 2,
     y: SCREEN_HEIGHT / 2,
   });
 
-  // Refs to always access the latest handler functions (fixes stale closure issue)
-  const handleSwipeRef = useRef<(direction: 'left' | 'right' | 'up' | 'down') => void>(() => {});
-  const resetPositionRef = useRef<() => void>(() => {});
+  // Refs to always access the latest values (fixes stale closure issue)
+  const currentIndexRef = useRef(currentIndex);
+  const moviesRef = useRef(movies);
+
+  // Keep refs in sync synchronously to avoid stale reads in gesture callbacks
+  currentIndexRef.current = currentIndex;
+  moviesRef.current = movies;
 
   // Debug logging for currentIndex changes
   useEffect(() => {
@@ -142,154 +133,46 @@ export default function SwipeDeck({
     [updateCardCenter]
   );
 
-  const computeTargetOffset = useCallback(
-    (
-      iconPosition: ProfileIconPosition | null | undefined,
-      fallback: { x: number; y: number }
-    ) => {
-      if (!iconPosition) {
-        return fallback;
-      }
-
-      return {
-        x: iconPosition.x - cardCenter.current.x,
-        y: iconPosition.y - cardCenter.current.y,
-      };
-    },
-    []
-  );
-
-  const getProfileTargetOffset = useCallback(() => {
-    return computeTargetOffset(profileIconPosition, {
-      x: SCREEN_WIDTH * 0.9 - SCREEN_WIDTH / 2,
-      y: SCREEN_HEIGHT * 0.85 - SCREEN_HEIGHT / 2,
-    });
-  }, [computeTargetOffset, profileIconPosition]);
-
-  const throwCardIntoTarget = useCallback(
-    (targetX: number, targetY: number, config: ThrowConfig = {}) => {
-      const {
-        arcPeakX = targetX * 0.35,
-        arcPeakY = Math.min(-SCREEN_HEIGHT * 0.35, targetY - 120),
-        liftDuration = 320,
-        diveDuration = 420,
-        peakScale = 0.78,
-        finalScale = 0.02,
-        liftOpacity = 0.9,
-        finalOpacity = 0,
-        impactOffsetX = targetX >= 0 ? 8 : -8,
-        impactOffsetY = 16,
-        easingUp = Easing.out(Easing.quad),
-        easingDown = Easing.in(Easing.cubic),
-      } = config;
-
-      const impactX = targetX + impactOffsetX;
-      const impactY = targetY + impactOffsetY;
-
-      // Get current overlay opacity to maintain it during animation
-      const currentOverlayOpacity = (overlayOpacity as any)._value || 0.2;
-
-      return new Promise<void>((resolve) => {
-        Animated.sequence([
-          Animated.parallel([
-            Animated.timing(position, {
-              toValue: { x: arcPeakX, y: arcPeakY },
-              duration: liftDuration,
-              easing: easingUp,
-              useNativeDriver: false,
-            }),
-            Animated.timing(scale, {
-              toValue: peakScale,
-              duration: liftDuration,
-              easing: easingUp,
-              useNativeDriver: false,
-            }),
-            Animated.timing(cardOpacity, {
-              toValue: liftOpacity,
-              duration: liftDuration,
-              easing: easingUp,
-              useNativeDriver: false,
-            }),
-            // Keep overlay visible during lift, fade with card
-            Animated.timing(overlayOpacity, {
-              toValue: currentOverlayOpacity * liftOpacity,
-              duration: liftDuration,
-              easing: easingUp,
-              useNativeDriver: false,
-            }),
-          ]),
-          Animated.parallel([
-            Animated.timing(position, {
-              toValue: { x: impactX, y: impactY },
-              duration: diveDuration,
-              easing: easingDown,
-              useNativeDriver: false,
-            }),
-            Animated.timing(scale, {
-              toValue: finalScale,
-              duration: diveDuration,
-              easing: easingDown,
-              useNativeDriver: false,
-            }),
-            Animated.timing(cardOpacity, {
-              toValue: finalOpacity,
-              duration: diveDuration,
-              easing: easingDown,
-              useNativeDriver: false,
-            }),
-            // Fade overlay out with card
-            Animated.timing(overlayOpacity, {
-              toValue: 0,
-              duration: diveDuration,
-              easing: easingDown,
-              useNativeDriver: false,
-            }),
-          ]),
-        ]).start(() => {
-          // Reset overlay after animation
-          overlayOpacity.setValue(0);
-          setOverlayColorState('transparent');
-          resolve();
-        });
-      });
-    },
-    [cardOpacity, position, scale, overlayOpacity]
-  );
-
-  const finishProfileCatch = () => {
-    onProfileShake?.();
-    setTimeout(() => {
-      // Reset values before calling nextCard
-      position.setValue({ x: 0, y: 0 });
-      scale.setValue(1);
-      cardOpacity.setValue(1);
-      // Ensure animation flag is reset before nextCard sets it
-      isAnimating.current = false;
-      nextCard();
-    }, 280);
-  };
+  const clearGestureContext = useCallback(() => {
+    gestureMovieRef.current = null;
+    gestureIndexRef.current = null;
+  }, []);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => !isAnimating.current,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
+        // Only start pan responder if movement is significant
+        if (isAnimating.current) return false;
+        const moved = Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
+        if (moved) {
+          hasMoved.current = true;
+        }
+        return moved;
       },
       onPanResponderGrant: () => {
-        position.setOffset({
-          x: (position.x as any)._value,
-          y: (position.y as any)._value,
-        });
+        if (isAnimating.current) return;
+        hasMoved.current = false; // Reset on grant
+        gestureMovieRef.current = moviesRef.current[currentIndexRef.current] || null;
+        gestureIndexRef.current = currentIndexRef.current;
+        position.stopAnimation();
+        position.setOffset({ x: 0, y: 0 });
         position.setValue({ x: 0, y: 0 });
       },
       onPanResponderMove: (_, gesture) => {
         if (isAnimating.current) return;
+
+        const activeMovie = gestureMovieRef.current || moviesRef.current[currentIndexRef.current];
+        if (!activeMovie) return;
         
-        const { dx, dy } = gesture;
+        const { dx, dy, vy } = gesture;
         const absDx = Math.abs(dx);
         const absDy = Math.abs(dy);
-        
-        // Allow normal movement for all directions including down
+        if (!hasMoved.current && (absDx > 2 || absDy > 2)) {
+          hasMoved.current = true;
+        }
+
+        // Allow normal movement for all directions (up swipe no longer opens details)
         position.setValue({ x: dx, y: dy });
         rotate.setValue(dx / 12);
         flipY.setValue(0); // No flip animation
@@ -311,18 +194,17 @@ export default function SwipeDeck({
           }
         } else {
           // Vertical
-          if (dy < 0) {
-            labelDirection.current = 'up';
+          if (dy > 0) {
+            labelDirection.current = 'down';
             setOverlayColorState('#FFD700'); // Yellow for Seen
             setCardBorderColor('#FFD700'); // Yellow border for Seen
             overlayOpacity.setValue(Math.min(absDy / 150, 0.2));
             labelOpacity.setValue(Math.min(absDy / 80, 1));
           } else {
-            labelDirection.current = 'down';
-            setOverlayColorState('#FFD700'); // Yellow for Details
-            setCardBorderColor('#DC2026'); // Keep red for Details (no action)
-            overlayOpacity.setValue(Math.min(absDy / 150, 0.2));
-            labelOpacity.setValue(Math.min(absDy / 80, 1));
+            // Upward swipe does nothing for details now; clear indicators
+            labelDirection.current = null;
+            overlayOpacity.setValue(0);
+            labelOpacity.setValue(0);
           }
         }
       },
@@ -331,17 +213,30 @@ export default function SwipeDeck({
         
         position.flattenOffset();
         
+        const activeMovie = gestureMovieRef.current || moviesRef.current[currentIndexRef.current];
+        const activeIndex = gestureIndexRef.current ?? currentIndexRef.current;
         const { dx, dy, vx, vy } = gesture;
         const absDx = Math.abs(dx);
         const absDy = Math.abs(dy);
         const absVx = Math.abs(vx);
         const absVy = Math.abs(vy);
 
+        // Check if this was just a tap (no significant movement)
+        const isTap = absDx < 10 && absDy < 10 && absVx < 0.3 && absVy < 0.3;
+        
+        if (isTap && !hasMoved.current && activeMovie) {
+          console.log('[SwipeDeck] tap detected on movie:', activeMovie.id, activeMovie.title, 'at index:', activeIndex);
+          onDetails?.(activeMovie);
+          resetPosition();
+          clearGestureContext();
+          return;
+        }
+
         // Use velocity to help determine direction if distance is borderline
         const isHorizontal = absDx > absDy || (absDx === absDy && absVx > absVy);
         
         // Determine swipe direction before resetting overlay
-        let swipeDirection: 'left' | 'right' | 'up' | 'down' | null = null;
+        let swipeDirection: 'left' | 'right' | 'down' | null = null;
         
         if (isHorizontal) {
           // Horizontal swipe
@@ -352,130 +247,88 @@ export default function SwipeDeck({
           }
         } else {
           // Vertical swipe
-          if (dy < -SWIPE_THRESHOLD || (dy < -50 && vy < -VELOCITY_THRESHOLD)) {
-            swipeDirection = 'up';
-          } else if (dy > SWIPE_THRESHOLD || (dy > 50 && vy > VELOCITY_THRESHOLD)) {
+          if (dy > SWIPE_THRESHOLD || (dy > 50 && vy > VELOCITY_THRESHOLD)) {
             swipeDirection = 'down';
           }
         }
         
-        // For right/up swipes, keep overlay visible during animation
-        // For left/down or no swipe, reset overlay
-        if (swipeDirection === 'right' || swipeDirection === 'up') {
-          // Keep overlay visible - it will fade with the card
-          labelOpacity.setValue(0); // Hide label but keep overlay
-        } else {
-          // Reset overlay for left/down/no swipe
-          overlayOpacity.setValue(0);
-          setOverlayColorState('transparent');
-          labelOpacity.setValue(0);
-          labelDirection.current = null;
-        }
+        // Reset overlay for all swipes
+        overlayOpacity.setValue(0);
+        setOverlayColorState('transparent');
+        labelOpacity.setValue(0);
+        labelDirection.current = null;
 
-        if (swipeDirection) {
-          handleSwipeRef.current(swipeDirection);
+        if (swipeDirection && activeMovie) {
+          handleSwipe(activeMovie, activeIndex, swipeDirection);
         } else {
-          resetPositionRef.current();
+          resetPosition();
         }
+        clearGestureContext();
       },
     })
   ).current;
 
-  const handleSwipe = (direction: 'left' | 'right' | 'up' | 'down') => {
-    if (isAnimating.current || currentIndex >= movies.length) return;
+  const handleSwipe = (movie: MovieBase | Movie, index: number, direction: 'left' | 'right' | 'down') => {
+    // Guard against double-firing while animating
+    if (isAnimating.current || index >= moviesRef.current.length) return;
 
     isAnimating.current = true;
-    const movie = movies[currentIndex];
-    console.log(`[SwipeDeck] Swipe ${direction} on movie: ${movie.id} ${movie.title} (index: ${currentIndex})`);
+    console.log(`[SwipeDeck] Swipe ${direction} on movie: ${movie.id} ${movie.title} (index: ${index})`);
 
     let x = 0;
     let y = 0;
-    let shouldAdvance = true;
 
     switch (direction) {
       case 'right':
-        // Change border to green for "Watchlist"
-        setCardBorderColor('#4caf50'); // Green
+        // Throw right (Watchlist)
+        x = SCREEN_WIDTH * 1.5;
         onSwipeRight?.(movie);
-        // Card arcs up then to Profile tab, shrinking INTO the icon
-        // Keep the green border color during animation
-        const { x: profileTargetX, y: profileTargetY } = getProfileTargetOffset();
-        throwCardIntoTarget(profileTargetX, profileTargetY).then(finishProfileCatch);
-        return;
+        break;
       case 'left':
+        // Throw left (Skip)
         x = -SCREEN_WIDTH * 1.5;
         onSwipeLeft?.(movie);
         break;
-      case 'up':
-        // Change border to yellow for "Seen"
-        setCardBorderColor('#FFD700'); // Yellow
-        onSwipeUp?.(movie);
-        // Keep the yellow border color during animation
-        const { x: seenTargetX, y: seenTargetY } = getProfileTargetOffset();
-        throwCardIntoTarget(seenTargetX, seenTargetY, {
-          arcPeakX: seenTargetX * 0.2,
-          arcPeakY: Math.min(-SCREEN_HEIGHT * 0.25, seenTargetY - 90),
-          liftDuration: 260,
-          diveDuration: 360,
-          peakScale: 0.88,
-          liftOpacity: 0.95,
-        }).then(finishProfileCatch);
-        return;
       case 'down':
-        // Swipe down to show details - card moves down and then resets
-        y = SCREEN_HEIGHT * 0.3; // Move down a bit to show action
-        console.log('[SwipeDeck] swipe down on movie:', movie.id, movie.title, 'from index:', currentIndex);
-        onSwipeDown?.(movie);
-        shouldAdvance = false;
-        // Animate down then reset
-        Animated.sequence([
-          Animated.timing(position, {
-            toValue: { x: 0, y },
-            duration: 200,
-            useNativeDriver: false,
-          }),
-          Animated.timing(position, {
-            toValue: { x: 0, y: 0 },
-            duration: 200,
-            useNativeDriver: false,
-          }),
-        ]).start(() => {
-          isAnimating.current = false;
-          resetPosition();
-        });
-        return;
+        // Throw down (Add to Seen bucket)
+        y = SCREEN_HEIGHT * 1.5;
+        onSwipeDown?.(movie); // Add to Seen bucket
+        break;
     }
 
-    if (shouldAdvance) {
-      isAnimating.current = true;
-      Animated.parallel([
-        Animated.timing(position, {
-          toValue: { x, y },
-          duration: 250,
-          useNativeDriver: false,
-        }),
-        Animated.timing(rotate, {
-          toValue: direction === 'left' ? -30 : 0,
-          duration: 250,
-          useNativeDriver: false,
-        }),
-        Animated.timing(cardOpacity, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: false,
-        }),
-      ]).start(() => {
+    overlayOpacity.setValue(0);
+    labelOpacity.setValue(0);
+    labelDirection.current = null;
+    position.flattenOffset();
+
+    // All swipes now advance to next card with simple throw animation
+    Animated.parallel([
+      Animated.timing(position, {
+        toValue: { x, y },
+        duration: 250,
+        useNativeDriver: false,
+      }),
+      Animated.timing(rotate, {
+        toValue: direction === 'left' ? -30 : direction === 'right' ? 30 : 0,
+        duration: 250,
+        useNativeDriver: false,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
         nextCard();
-      });
-    }
+      } else {
+        isAnimating.current = false;
+      }
+    });
   };
 
   const resetPosition = () => {
-    // Reset all values immediately
-    position.setValue({ x: 0, y: 0 });
-    rotate.setValue(0);
-    scale.setValue(1);
-    cardOpacity.setValue(1);
+    isAnimating.current = true;
     overlayOpacity.setValue(0);
     labelOpacity.setValue(0);
     setOverlayColorState('transparent');
@@ -514,68 +367,69 @@ export default function SwipeDeck({
   };
 
   const nextCard = () => {
-    console.log(`[SwipeDeck] nextCard called, currentIndex before: ${currentIndex}`);
-    setCurrentIndex((prev) => {
-      const next = prev + 1;
-      console.log(`[SwipeDeck] nextCard: ${prev} → ${next} (total: ${movies.length})`);
-      if (next < movies.length) {
-        // Keep animation flag true during slide-up
-        isAnimating.current = true;
-        
-        // Flatten any existing offset from previous gesture
-        position.flattenOffset();
-        
-        // Start new ticket completely offscreen below (immediate fast slide-up)
-        position.setValue({ x: 0, y: SCREEN_HEIGHT * 0.6 });
-        rotate.setValue(0);
-        flipY.setValue(0);
-        scale.setValue(0.95);
-        cardOpacity.setValue(0.8);
-        overlayOpacity.setValue(0);
-        labelOpacity.setValue(0);
-        setOverlayColorState('transparent');
-        setCardBorderColor('#FFFEAD'); // Reset to default butter yellow
-        labelDirection.current = null;
-        
-        // Immediate fast slide-up animation with bounce
-        Animated.parallel([
-          Animated.spring(position, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: false,
-            tension: 100, // Faster
-            friction: 7,
-          }),
-          Animated.spring(scale, {
-            toValue: 1,
-            useNativeDriver: false,
-            tension: 100, // Faster
-            friction: 7,
-          }),
-          Animated.timing(cardOpacity, {
-            toValue: 1,
-            duration: 120, // Faster fade-in
-            useNativeDriver: false,
-          }),
-        ]).start(() => {
-          // Ensure position is at origin and ready for next gesture
-          position.flattenOffset();
-          position.setValue({ x: 0, y: 0 });
-          // Reset animation flag so gestures work
-          isAnimating.current = false;
-        });
-      } else {
-        // No more cards, reset animation flag
-        isAnimating.current = false;
-      }
-      return next;
+    const next = currentIndexRef.current + 1;
+    const totalMovies = moviesRef.current.length;
+    console.log(`[SwipeDeck] nextCard called, currentIndex before: ${currentIndexRef.current}, next: ${next} (total: ${totalMovies})`);
+
+    if (next >= totalMovies) {
+      currentIndexRef.current = next;
+      setCurrentIndex(next);
+      isAnimating.current = false;
+      return;
+    }
+
+    // New top card should be ready to interact immediately
+    hasMoved.current = false;
+    clearGestureContext();
+
+    // Prepare next card offscreen and animate it up
+    position.setValue({ x: 0, y: SCREEN_HEIGHT * 0.6 });
+    rotate.setValue(0);
+    flipY.setValue(0);
+    scale.setValue(0.95);
+    cardOpacity.setValue(0.8);
+    overlayOpacity.setValue(0);
+    labelOpacity.setValue(0);
+    setOverlayColorState('transparent');
+    setCardBorderColor('#FFFEAD'); // Reset to default butter yellow
+    labelDirection.current = null;
+
+    currentIndexRef.current = next;
+    setCurrentIndex(next);
+    // Allow gestures while the incoming card animates into place
+    isAnimating.current = false;
+
+    Animated.parallel([
+      Animated.spring(position, {
+        toValue: { x: 0, y: 0 },
+        useNativeDriver: false,
+        tension: 100, // Faster
+        friction: 7,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: false,
+        tension: 100, // Faster
+        friction: 7,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 120, // Faster fade-in
+        useNativeDriver: false,
+      }),
+    ]).start(() => {
+      // Ensure position is at origin and ready for next gesture
+      position.flattenOffset();
+      position.setValue({ x: 0, y: 0 });
+      // Reset animation flag so gestures work
+      isAnimating.current = false;
     });
-    // Note: The state update above is async, so currentIndex won't reflect the new value immediately
-    console.log(`[SwipeDeck] nextCard complete, currentIndex will update to next value on next render`);
   };
 
   const getCardStyle = (index: number) => {
-    const isTopCard = index === currentIndex;
-    const isNextCard = index === currentIndex + 1;
+    const currentIdx = currentIndex;
+    const isTopCard = index === currentIdx;
+    const isNextCard = index === currentIdx + 1;
 
     if (isTopCard) {
       return {
@@ -637,23 +491,6 @@ export default function SwipeDeck({
     });
   };
 
-  const getOverlayColor = () => {
-    if (!labelDirection.current) return 'transparent';
-    
-    switch (labelDirection.current) {
-      case 'right':
-        return '#4caf50'; // Green for Watchlist
-      case 'left':
-        return '#DC2026'; // Red for Not Interested
-      case 'up':
-        return '#FFD700'; // Yellow for Seen
-      case 'down':
-        return '#FFD700'; // Yellow for Details
-      default:
-        return 'transparent';
-    }
-  };
-
   const getLabelConfig = () => {
     if (!labelDirection.current) return null;
     
@@ -662,27 +499,26 @@ export default function SwipeDeck({
         return { label: 'Watchlist', emoji: '🔖', color: '#4caf50' }; // Green
       case 'left':
         return { label: 'Pass', emoji: '🚫', color: '#DC2026' }; // Red
-      case 'up':
-        return { label: 'Seen', emoji: '✅', color: '#FFD700' }; // Yellow
       case 'down':
-        return { label: 'Details', emoji: 'ℹ️', color: '#FFD700' }; // Yellow
+        return { label: 'Seen', emoji: '✅', color: '#FFD700' }; // Yellow for Seen
       default:
         return null;
     }
   };
 
-  // Update refs to always point to the latest functions with current closures
-  // This fixes the stale closure issue in panResponder
-  handleSwipeRef.current = handleSwipe;
-  resetPositionRef.current = resetPosition;
-
   const renderCard = (movie: MovieBase | Movie, index: number) => {
-    if (index < currentIndex) return null;
-    if (index > currentIndex + 2) return null;
+    const currentIdx = currentIndex;
+    if (index < currentIdx) return null;
+    if (index > currentIdx + 2) return null;
 
     const cardStyle = getCardStyle(index);
     const zIndex = movies.length - index;
-    const isTopCard = index === currentIndex;
+    const isTopCard = index === currentIdx;
+    
+    // Debug: Log which card is being rendered as top card
+    if (isTopCard) {
+      console.log(`[SwipeDeck] Rendering top card: ${movie.id} ${movie.title} at index ${index}, currentIndex: ${currentIdx}`);
+    }
     const labelConfig = isTopCard ? getLabelConfig() : null;
 
     return (

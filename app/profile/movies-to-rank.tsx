@@ -5,7 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import MovieListItem from '../../src/components/MovieListItem';
 import DetailsModal from '../../src/components/DetailsModal';
-import { getUnrankedSeenIds, getSeenIds, getRankedIds } from '../../src/state/library';
+import AssignToListSheet from '../../src/components/AssignToListSheet';
+import { getMoviesToBeRankedIds, assignMovieToLists } from '../../src/state/library';
 import { getMoviesByIds } from '../../src/lib/movieHelpers';
 import type { Movie, MovieBase } from '../../src/types/movie';
 
@@ -14,42 +15,34 @@ export default function MoviesToRankScreen() {
   const [movies, setMovies] = useState<(Movie | MovieBase)[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | MovieBase | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
+  const [assignSheetVisible, setAssignSheetVisible] = useState(false);
+  const [movieToAssign, setMovieToAssign] = useState<Movie | MovieBase | null>(null);
 
   // Reload unranked seen movies every time the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('[Movies to Rank] Screen focused, loading data...');
+      console.log('[Movies to be Logged] Screen focused, loading data...');
       loadUnrankedMovies();
     }, [])
   );
 
   const loadUnrankedMovies = () => {
-    // Get the IDs of movies that are seen but not yet ranked
-    const unrankedIds = getUnrankedSeenIds();
-    console.log('[Movies to Rank] Unranked IDs from library:', unrankedIds);
-    
-    // Debug: Check if specific movies are seen or ranked
-    const seenIds = getSeenIds();
-    const rankedIds = getRankedIds();
-    console.log('[Movies to Rank] All seen IDs:', seenIds);
-    console.log('[Movies to Rank] All ranked IDs:', rankedIds);
-    console.log('[Movies to Rank] Checking specific movies:');
-    console.log('  - Movie 1 (Oppenheimer): seen=', seenIds.includes('1'), 'ranked=', rankedIds.includes('1'));
-    console.log('  - Movie 2 (Dune): seen=', seenIds.includes('2'), 'ranked=', rankedIds.includes('2'));
-    console.log('  - Movie 3 (Everything Everywhere): seen=', seenIds.includes('3'), 'ranked=', rankedIds.includes('3'));
+    // Get the IDs of movies in the "Movies to be Logged" inbox bucket
+    const moviesToBeRankedIds = getMoviesToBeRankedIds();
+    console.log('[Movies to be Logged] Movies to be Logged IDs from library:', moviesToBeRankedIds);
 
     // Convert those IDs into full movie objects
-    const unrankedMovies = getMoviesByIds(unrankedIds);
-    console.log('[Movies to Rank] Loaded movies:', unrankedMovies.map(m => ({ id: m.id, title: m.title })));
+    const moviesToRank = getMoviesByIds(moviesToBeRankedIds);
+    console.log('[Movies to be Logged] Loaded movies:', moviesToRank.map(m => ({ id: m.id, title: m.title })));
 
-    setMovies(unrankedMovies);
+    setMovies(moviesToRank);
   };
 
   const handleRankNow = () => {
     if (movies.length === 0) {
       Alert.alert(
-        'No Movies to Rank',
-        'You need to mark some movies as seen first. Swipe up on movies in the Feed to mark them as seen.',
+        'No Movies to Log',
+        'You need to mark some movies as seen first. Swipe down on movies in the Feed to mark them as seen.',
         [{ text: 'OK' }]
       );
       return;
@@ -66,9 +59,32 @@ export default function MoviesToRankScreen() {
   };
 
   const handleCardPress = (movie: Movie | MovieBase) => {
-    console.log('[Movies to Rank] Opening details for:', movie.id, movie.title);
-    setSelectedMovie(movie);
-    setDetailsVisible(true);
+    console.log('[Movies to be Logged] Opening assign sheet for:', movie.id, movie.title);
+    setMovieToAssign(movie);
+    setAssignSheetVisible(true);
+  };
+
+  const handleAssignDone = (addToMasterRankings: boolean, customListIds: string[]) => {
+    if (!movieToAssign) {
+      console.log('[Movies to be Logged] handleAssignDone called but movieToAssign is null');
+      return;
+    }
+    
+    console.log('[Movies to be Logged] Assigning movie to lists:', {
+      movie: movieToAssign.id,
+      masterRankings: addToMasterRankings,
+      customLists: customListIds.length,
+    });
+    
+    // Assign movie to selected lists
+    assignMovieToLists(movieToAssign.id, addToMasterRankings, customListIds);
+    
+    // Close the sheet and refresh the list
+    setAssignSheetVisible(false);
+    setMovieToAssign(null);
+    
+    // Reload movies to reflect the removal from inbox
+    loadUnrankedMovies();
   };
 
   return (
@@ -76,7 +92,7 @@ export default function MoviesToRankScreen() {
       {/* Configure the header for this screen */}
       <Stack.Screen
         options={{
-          title: 'Movies to Rank',
+          title: 'Movies to be Logged',
           headerStyle: { backgroundColor: '#7E1616' },
           headerTintColor: '#FFFEAD',
           headerLeft: () => (
@@ -109,18 +125,18 @@ export default function MoviesToRankScreen() {
             <Ionicons name="film-outline" size={64} color="#8e8e93" />
             <Text style={styles.emptyTitle}>All Caught Up!</Text>
             <Text style={styles.emptyText}>
-              You don't have any unranked movies right now.
+              You don't have any movies waiting to be logged.
             </Text>
             <Text style={styles.emptySubtext}>
-              Swipe up on movies in the Feed to mark them as seen, and they'll appear here for ranking.
+              Movies you mark as seen will appear here until you assign them to a list.
             </Text>
           </View>
         ) : (
           // List of seen movies
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <Text style={styles.title}>Movies to Rank</Text>
+            <Text style={styles.title}>Movies to be Logged</Text>
             <Text style={styles.subtitle}>
-              {movies.length} {movies.length === 1 ? 'movie' : 'movies'} ready for ranking
+              {movies.length} {movies.length === 1 ? 'movie' : 'movies'} waiting to be assigned to lists
             </Text>
 
             <View style={styles.movieList}>
@@ -148,6 +164,17 @@ export default function MoviesToRankScreen() {
             }}
           />
         )}
+
+        {/* Assign to List Sheet */}
+        <AssignToListSheet
+          visible={assignSheetVisible}
+          movie={movieToAssign}
+          onDone={handleAssignDone}
+          onClose={() => {
+            setAssignSheetVisible(false);
+            setMovieToAssign(null);
+          }}
+        />
       </View>
     </>
   );

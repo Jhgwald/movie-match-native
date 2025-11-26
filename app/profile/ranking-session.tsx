@@ -4,7 +4,18 @@ import { Stack, useRouter, useLocalSearchParams, useFocusEffect } from 'expo-rou
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { getMoviesByIds } from '../../src/lib/movieHelpers';
-import { getRankedMovies, saveRankingSession, getUnrankedSeenIds } from '../../src/state/library';
+import {
+  getRankedMovies,
+  saveRankingSession,
+  getUnrankedSeenIds,
+  getCustomList,
+  getCustomListRankedIds,
+  getCustomListWaitingIds,
+  updateCustomListRankedIds,
+  getMasterRankingsRankedIds,
+  getMasterRankingsWaitingIds,
+  updateMasterRankingsRankedIds,
+} from '../../src/state/library';
 import type { Movie, MovieBase } from '../../src/types/movie';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -219,10 +230,13 @@ export default function RankingSessionScreen() {
   const [existingRankedMovies, setExistingRankedMovies] = useState<(Movie | MovieBase)[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [listId, setListId] = useState<string | null>(null);
+  const [isMasterRankings, setIsMasterRankings] = useState(false);
 
   /**
    * Initialize ranking session by loading current bucket state
    * This function is reusable and can be called multiple times for new sessions
+   * Supports both global ranking and per-list ranking
    */
   const initializeRankingSession = useCallback(() => {
     console.log('[Ranking Session] Initializing ranking session...');
@@ -230,36 +244,92 @@ export default function RankingSessionScreen() {
     setShowResults(false); // Reset results when starting new session
     
     try {
-      // Get candidate movies from "Movies to Rank" bucket (unranked seen movies)
-      // This excludes skipped movies and already-ranked movies
-      let movieIds: string[] = [];
+      // Check if this is a list-specific ranking session
+      const listIdParam = params.listId as string | undefined;
+      const isMasterRankingsParam = params.isMasterRankings === 'true';
+      const singleMovieId = params.singleMovieId as string | undefined;
       
-      if (params.movieIds) {
-        // Use movie IDs passed from "Rank Now" button
-        movieIds = JSON.parse(params.movieIds as string);
-        console.log('[Ranking Session] Using movieIds from params:', movieIds);
+      setListId(listIdParam || null);
+      setIsMasterRankings(isMasterRankingsParam);
+      
+      let candidateIds: string[] = [];
+      let existingRankedIds: string[] = [];
+      
+      if (listIdParam || isMasterRankingsParam) {
+        // Per-list ranking session
+        if (isMasterRankingsParam) {
+          // Master Rankings
+          const waitingIds = getMasterRankingsWaitingIds();
+          const rankedIds = getMasterRankingsRankedIds();
+          
+          if (singleMovieId) {
+            // Single movie ranking - only rank this one movie
+            candidateIds = [singleMovieId];
+            existingRankedIds = rankedIds;
+            console.log('[Ranking Session] Master Rankings single movie mode - movie:', singleMovieId, 'ranked:', rankedIds.length);
+          } else {
+            // Rank all waiting movies
+            candidateIds = waitingIds;
+            existingRankedIds = rankedIds;
+            console.log('[Ranking Session] Master Rankings mode - waiting:', waitingIds.length, 'ranked:', rankedIds.length);
+          }
+        } else if (listIdParam) {
+          // Custom list
+          const list = getCustomList(listIdParam);
+          if (!list) {
+            console.error('[Ranking Session] List not found:', listIdParam);
+            router.back();
+            return;
+          }
+          const waitingIds = getCustomListWaitingIds(listIdParam);
+          const rankedIds = getCustomListRankedIds(listIdParam);
+          
+          if (singleMovieId) {
+            // Single movie ranking - only rank this one movie
+            candidateIds = [singleMovieId];
+            existingRankedIds = rankedIds;
+            console.log('[Ranking Session] Custom list single movie mode - list:', list.name, 'movie:', singleMovieId, 'ranked:', rankedIds.length);
+          } else {
+            // Rank all waiting movies
+            candidateIds = waitingIds;
+            existingRankedIds = rankedIds;
+            console.log('[Ranking Session] Custom list mode - list:', list.name, 'waiting:', waitingIds.length, 'ranked:', rankedIds.length);
+          }
+        }
       } else {
-        // Fallback: get from unranked seen movies (excludes skipped)
-        movieIds = getUnrankedSeenIds();
-        console.log('[Ranking Session] Using unranked seen IDs:', movieIds);
+        // Global ranking session (original behavior)
+        let movieIds: string[] = [];
+        
+        if (params.movieIds) {
+          // Use movie IDs passed from "Rank Now" button
+          movieIds = JSON.parse(params.movieIds as string);
+          console.log('[Ranking Session] Using movieIds from params:', movieIds);
+        } else {
+          // Fallback: get from unranked seen movies (excludes skipped)
+          movieIds = getUnrankedSeenIds();
+          console.log('[Ranking Session] Using unranked seen IDs:', movieIds);
+        }
+        
+        candidateIds = movieIds;
+        
+        // Get existing ranked movies (ordered from best to worst)
+        const rankedData = getRankedMovies();
+        existingRankedIds = rankedData.map(rm => rm.movieId);
       }
 
-      const candidates = getMoviesByIds(movieIds);
+      const candidates = getMoviesByIds(candidateIds);
+      const existingRanked = getMoviesByIds(existingRankedIds);
+      
       setCandidateMovies(candidates);
-
-      // Get existing ranked movies (ordered from best to worst)
-      // getRankedMovies() already excludes skipped movies
-      // IMPORTANT: This is reactive - it will get the latest ranked movies each time
-      const rankedData = getRankedMovies();
-      const rankedIds = rankedData.map(rm => rm.movieId);
-      const ranked = getMoviesByIds(rankedIds);
-      setExistingRankedMovies(ranked);
+      setExistingRankedMovies(existingRanked);
       
       console.log('[Ranking Session] Initialization complete:', {
+        mode: listIdParam ? 'list' : isMasterRankingsParam ? 'master-rankings' : 'global',
+        listId: listIdParam,
         candidatesCount: candidates.length,
         candidates: candidates.map(m => m.title),
-        rankedCount: ranked.length,
-        ranked: ranked.map(m => m.title),
+        rankedCount: existingRanked.length,
+        ranked: existingRanked.map(m => m.title),
       });
       
       // Mark initialization as complete - ALWAYS set to false, even if no candidates
@@ -270,7 +340,7 @@ export default function RankingSessionScreen() {
       setIsInitializing(false);
       router.back();
     }
-  }, [params.movieIds, router]);
+  }, [params.movieIds, params.listId, params.isMasterRankings, router]);
 
   // Run initialization when screen is focused (handles returning to screen)
   useFocusEffect(
@@ -316,17 +386,29 @@ export default function RankingSessionScreen() {
     const finalOrderIds = finalRankedMovies.map(movie => movie.id);
     const finalOrderSet = new Set(finalOrderIds);
 
-    const newlyRankedIds = candidateMovies
-      .map(movie => movie.id)
-      .filter(id => finalOrderSet.has(id) && !skippedIds.has(id));
-
-    if (newlyRankedIds.length > 0) {
-      saveRankingSession(newlyRankedIds, finalOrderIds, `session-${Date.now()}`);
+    // Check if this is a per-list ranking session
+    if (isMasterRankings) {
+      // Update Master Rankings
+      updateMasterRankingsRankedIds(finalOrderIds);
+      console.log('[Ranking Session] Updated Master Rankings with', finalOrderIds.length, 'movies');
+    } else if (listId) {
+      // Update custom list
+      updateCustomListRankedIds(listId, finalOrderIds);
+      console.log('[Ranking Session] Updated custom list', listId, 'with', finalOrderIds.length, 'movies');
     } else {
-      console.log('[Ranking Session] No new movies were inserted. Skipping persistence.');
+      // Global ranking session (original behavior)
+      const newlyRankedIds = candidateMovies
+        .map(movie => movie.id)
+        .filter(id => finalOrderSet.has(id) && !skippedIds.has(id));
+
+      if (newlyRankedIds.length > 0) {
+        saveRankingSession(newlyRankedIds, finalOrderIds, `session-${Date.now()}`);
+      } else {
+        console.log('[Ranking Session] No new movies were inserted. Skipping persistence.');
+      }
     }
 
-    // Navigate back to movies to rank
+    // Navigate back
     router.back();
   };
 
@@ -442,13 +524,23 @@ export default function RankingSessionScreen() {
     return null;
   }
 
+  // Special case: Single movie ranking with no existing ranked movies
+  // The hook should have auto-inserted it and marked complete
+  if (candidateMovies.length === 1 && existingRankedMovies.length === 0 && isComplete) {
+    console.log('[Ranking Session] Single movie with no existing rankings - already complete');
+    if (!showResults) {
+      setShowResults(true);
+    }
+    return null;
+  }
+
   // If no existing ranked movies, the hook should auto-insert the first candidate
   // The hook's useEffect should handle this automatically when candidateMovies are loaded
   // If hasExistingRankings is still false after initialization, it means either:
   // 1. The hook hasn't run yet (should be very brief)
   // 2. There's an issue with the hook initialization
   // In either case, we should show a brief loading state
-  if (!hasExistingRankings && candidateMovie) {
+  if (!hasExistingRankings && candidateMovie && !isComplete) {
     console.log('[Ranking Session] No existing rankings yet, candidate exists:', candidateMovie.title);
     console.log('[Ranking Session] Waiting for hook to auto-insert first candidate...');
     // The hook's useEffect should handle this, but give it a moment
@@ -474,7 +566,8 @@ export default function RankingSessionScreen() {
   
   // If no rankedMovie and no existing rankings, but we have a candidate,
   // the hook should have inserted it by now. If not, there might be an issue.
-  if (!rankedMovie && !hasExistingRankings && candidateMovie) {
+  // But if it's complete, we should show results instead
+  if (!rankedMovie && !hasExistingRankings && candidateMovie && !isComplete) {
     console.log('[Ranking Session] WARNING: Candidate exists but no rankedMovie and no existing rankings');
     // Fall back to showing loading - the hook should fix this
     return (
